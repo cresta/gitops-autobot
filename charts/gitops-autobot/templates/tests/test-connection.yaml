@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "gitops-autobot.fullname" . }}-test-connection"
+  labels:
+    {{- include "gitops-autobot.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+    - name: wget
+      image: busybox
+      command: ['wget']
+      args: ['{{ include "gitops-autobot.fullname" . }}:{{ .Values.service.port }}']
+  restartPolicy: Never
