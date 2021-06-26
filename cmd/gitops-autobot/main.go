@@ -22,6 +22,8 @@ type config struct {
 	DebugListenAddr string
 	Tracer          string
 	LogLevel        string
+	GithubRepos     string
+	AppPrivateKey   string
 }
 
 func (c config) WithDefaults() config {
@@ -45,7 +47,12 @@ func getConfig() config {
 		DebugListenAddr: os.Getenv("DEBUG_ADDR"),
 		// Allows you to use a dynamic tracer
 		Tracer:   os.Getenv("TRACER"),
+		// Level to log at
 		LogLevel: os.Getenv("LOG_LEVEL"),
+		// Token for repo cloning
+		AppPrivateKey: os.Getenv("APP_PRIVATE_KEY"),
+		// Repos to review
+		GithubRepos: os.Getenv("GITHUB_REPOS"),
 	}.WithDefaults()
 }
 
