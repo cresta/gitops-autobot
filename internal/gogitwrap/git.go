@@ -356,6 +356,37 @@ func ZipContent(ctx context.Context, into io.Writer, prefix string, from *GitChe
 	return numFiles, nil
 }
 
+type File interface {
+	Name() string
+	io.WriterTo
+}
+
+func (g *GitCheckout) EveryFile(ctx context.Context) ([]File, error) {
+	w, err := g.reference()
+	if err != nil {
+		return nil, fmt.Errorf("unable to get repo head: %w", err)
+	}
+	t, err := g.repo.CommitObject(w.Hash())
+	if err != nil {
+		return nil, fmt.Errorf("unable to make tree object for hash %s: %w", w.Hash(), err)
+	}
+	itr, err := t.Files()
+	if err != nil {
+		return nil, fmt.Errorf("unable to get file iter: %w", err)
+	}
+	var ret []File
+	if err := itr.ForEach(func(file *object.File) error {
+		ret = append(ret, &readerWriterTo{
+			f: file,
+			z: g.log,
+		})
+		return nil
+	}); err != nil {
+		return nil, fmt.Errorf("unable to iter files: %w", err)
+	}
+	return ret, nil
+}
+
 func (g *GitCheckout) FileContent(ctx context.Context, fileName string) (io.WriterTo, error) {
 	var ret io.WriterTo
 	err := g.tracing.StartSpanFromContext(ctx, gotracing.SpanConfig{OperationName: "file_content"}, func(ctx context.Context) error {
@@ -385,6 +416,10 @@ func (g *GitCheckout) FileContent(ctx context.Context, fileName string) (io.Writ
 type readerWriterTo struct {
 	f *object.File
 	z *zapctx.Logger
+}
+
+func (r *readerWriterTo) Name() string {
+	return r.f.Name
 }
 
 func (r *readerWriterTo) WriteTo(w io.Writer) (n int64, err error) {

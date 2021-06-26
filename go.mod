@@ -13,7 +13,7 @@ require (
 	github.com/cresta/zapctx v0.0.1
 	github.com/go-git/go-git/v5 v5.4.2
 	github.com/go-logfmt/logfmt v0.5.0 // indirect
-	github.com/google/go-github/v29 v29.0.3 // indirect
+	github.com/google/go-github/v29 v29.0.3
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/gorilla/mux v1.8.0
 	github.com/kevinburke/ssh_config v1.1.0 // indirect
