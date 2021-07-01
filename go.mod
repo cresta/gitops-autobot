@@ -5,7 +5,7 @@ go 1.16
 require (
 	github.com/cresta/gotracing v0.0.3
 	github.com/cresta/httpsimple v0.0.1
-	github.com/cresta/magehelper v0.0.45
+	github.com/cresta/magehelper v0.0.51
 	github.com/cresta/zapctx v0.0.1
 	github.com/go-logfmt/logfmt v0.5.0 // indirect
 	github.com/gorilla/mux v1.8.0
