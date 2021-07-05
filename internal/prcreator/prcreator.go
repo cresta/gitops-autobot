@@ -17,7 +17,12 @@ type PrCreator struct {
 
 type ChangedGroup struct {
 	Changer Changer
-	ChangeRequest []*ChangeRequest
+	ChangeRequest []*FileChange
+}
+
+type FileChange struct {
+	ChangeRequest *ChangeRequest
+	File File
 }
 
 func (P *PrCreator) Run(ctx context.Context) error {
@@ -51,7 +56,7 @@ func (P *PrCreator) Run(ctx context.Context) error {
 	allChanges := make(map[string][]ChangedGroup)
 
 	for _, c := range changers {
-		cg := make(map[string][]*ChangeRequest)
+		cg := make(map[string][]*FileChange)
 		for _, file := range files {
 			cr, err := c.ChangeFile(ctx, file)
 			if err != nil {
@@ -61,7 +66,10 @@ func (P *PrCreator) Run(ctx context.Context) error {
 				P.log.Debug(ctx, "No change for this file")
 				continue
 			}
-			cg[cr.GroupHash] = append(cg[cr.GroupHash], cr)
+			cg[cr.GroupHash] = append(cg[cr.GroupHash], &FileChange{
+				ChangeRequest: cr,
+				File:          file,
+			})
 		}
 		for k,v := range cg {
 			allChanges[k] = append(allChanges[k], ChangedGroup{
@@ -75,7 +83,7 @@ func (P *PrCreator) Run(ctx context.Context) error {
 		if k == "" {
 			for _, cg := range v {
 				for _, cr := range cg.ChangeRequest {
-					allChanges := []*ChangeRequest{cr}
+					allChanges := []*FileChange{cr}
 					msg, err := cg.Changer.CommitMessage(ctx, allChanges)
 					if err != nil {
 						return fmt.Errorf("unable to make commit message for changer=%s: %w", cg.Changer.Desc(), err)
@@ -87,7 +95,7 @@ func (P *PrCreator) Run(ctx context.Context) error {
 			}
 			continue
 		}
-		var allChanges []*ChangeRequest
+		var allChanges []*FileChange
 		for _, cg := range v {
 			allChanges = append(allChanges, cg.ChangeRequest...)
 		}
@@ -109,7 +117,7 @@ func (P *PrCreator) Run(ctx context.Context) error {
 	return nil
 }
 
-func (P *PrCreator) CreateAndSendPr(ctx context.Context, msg string, changes []*ChangeRequest) error {
+func (P *PrCreator) CreateAndSendPr(ctx context.Context, msg string, changes []*FileChange) error {
 	return nil
 }
 

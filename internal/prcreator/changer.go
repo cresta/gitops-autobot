@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/cresta/gitops-autobot/internal/gogitwrap"
+	"github.com/go-git/go-git/v5"
 	"strings"
 	"time"
 )
@@ -15,10 +16,25 @@ type ChangerFactory interface {
 
 type File = gogitwrap.File
 
+type ChangeGroup struct {
+	CommitMessage string
+	GroupHash string
+}
+
 type Changer interface {
+	DoChanges(ctx context.Context, worktree git.Worktree) (*ChangeGroup, error)
+}
+
+type FileChange interface {
 	ChangeFile(ctx context.Context, file File) (*ChangeRequest, error)
-	Desc() string
-	CommitMessage(context.Context, []*ChangeRequest) (string, error)
+}
+
+func T(w git.Worktree) {
+	w.Filesystem.Open()
+}
+
+type PerFileChanger struct {
+
 }
 
 type ChangeRequest struct {
@@ -35,7 +51,7 @@ func (c *TimeChanger) Desc() string {
 	return "now_time"
 }
 
-func (c *TimeChanger) CommitMessage(_ context.Context, requests []*ChangeRequest) (string, error) {
+func (c *TimeChanger) CommitMessage(_ context.Context, requests []*FileChange) (string, error) {
 	return fmt.Sprintf("time change\nChanging %d files", len(requests)), nil
 }
 

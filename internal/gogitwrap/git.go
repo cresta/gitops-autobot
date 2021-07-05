@@ -162,6 +162,10 @@ func (g *GitCheckout) SetDefaultAuthor(name string, email string) {
 	}
 }
 
+func (g *GitCheckout) GetWorktree() (*git.Worktree, error) {
+	return g.repo.Worktree()
+}
+
 func (g *GitCheckout) CommitAndPush(ctx context.Context, commitMsg string, remoteBranch string) error {
 	w, err := g.repo.Worktree()
 	if err != nil {
