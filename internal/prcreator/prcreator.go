@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/cresta/gitops-autobot/internal/autobotcfg"
 	"github.com/cresta/gitops-autobot/internal/changemaker"
+	"github.com/cresta/gitops-autobot/internal/checkout"
 	"github.com/cresta/zapctx"
 	"github.com/google/go-github/v29/github"
 )
@@ -17,7 +18,7 @@ type PrCreator struct {
 	Client        *github.Client
 }
 
-func (p *PrCreator) Execute(ctx context.Context, checkout *Checkout, changers []changemaker.WorkingTreeChanger) error {
+func (p *PrCreator) Execute(ctx context.Context, checkout *checkout.Checkout, changers []changemaker.WorkingTreeChanger) error {
 	if err := checkout.Refresh(ctx); err != nil {
 		return fmt.Errorf("unable to refresh repo: %w", err)
 	}

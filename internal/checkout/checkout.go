@@ -1,4 +1,4 @@
-package prcreator
+package checkout
 
 import (
 	"bytes"
@@ -22,16 +22,14 @@ import (
 )
 
 type Checkout struct {
-	RepoConfig  autobotcfg.RepoConfig
-	GhTransport *ghinstallation.Transport
-	Auth        githttp.AuthMethod
-	Repo        *git.Repository
+	RepoConfig autobotcfg.RepoConfig
+	Auth       githttp.AuthMethod
+	Repo       *git.Repository
 }
 
 func NewCheckout(ctx context.Context, logger *zapctx.Logger, cfg autobotcfg.RepoConfig, cloneDataDirectory string, transport *ghinstallation.Transport) (*Checkout, error) {
 	ch := Checkout{
-		RepoConfig:  cfg,
-		GhTransport: transport,
+		RepoConfig: cfg,
 		Auth: &ghapp.DynamicHttpAuthMethod{
 			Logger: logger,
 			Itr:    transport,
