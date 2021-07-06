@@ -46,8 +46,9 @@ type GitCommitter interface {
 
 type WorkingTreeChanger interface {
 	// ChangeWorkingTree should create any branches it needs.  Each branch
-	// will be pushed as a separate PR.
-	ChangeWorkingTree(w git.Worktree, commit *object.Commit, gitCommitter GitCommitter) error
+	// will be pushed as a separate PR.  If the branch name exists in the remote, we will attempt
+	// a push, but ignore any errors around non-fast-forward.
+	ChangeWorkingTree(w git.Worktree, baseCommit *object.Commit, gitCommitter GitCommitter) error
 }
 
 type WorkingTreeChangerFactory func(cfg autobotcfg.ChangeMakerConfig) ([]WorkingTreeChanger, error)

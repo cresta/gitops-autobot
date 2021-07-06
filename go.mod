@@ -30,4 +30,5 @@ require (
 	golang.org/x/time v0.0.0-20210611083556-38a9dc6acbc6 // indirect
 	google.golang.org/protobuf v1.26.0 // indirect
 	gopkg.in/DataDog/dd-trace-go.v1 v1.31.1 // indirect
+	gopkg.in/yaml.v2 v2.3.0
 )

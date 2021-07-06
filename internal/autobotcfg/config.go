@@ -9,12 +9,21 @@ import (
 )
 
 type AutobotConfig struct {
+	PRCreator    GithubAppConfig
+	PRReviewer   *GithubAppConfig
 	ChangeMakers []ChangeMakerConfig
+}
+
+type GithubAppConfig struct {
+	AppID          int64
+	InstallationID int64
+	PEMKeyLoc      string
 }
 
 type ChangeMakerConfig struct {
 	Name           string
 	FileMatchRegex []string
+	AutoApprove    bool
 	regexp         []*regexp.Regexp
 }
 
