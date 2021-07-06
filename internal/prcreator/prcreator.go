@@ -12,13 +12,13 @@ import (
 
 type PrCreator struct {
 	F             *changemaker.Factory
-	AutobotConfig autobotcfg.AutobotConfig
-	Logger        zapctx.Logger
+	AutobotConfig *autobotcfg.AutobotConfig
+	Logger        *zapctx.Logger
 	GitCommitter  changemaker.GitCommitter
 	Client        *github.Client
 }
 
-func (p *PrCreator) Execute(ctx context.Context, checkout *checkout.Checkout, changers []changemaker.WorkingTreeChanger) error {
+func (p *PrCreator) Execute(ctx context.Context, checkout *checkout.Checkout) error {
 	if err := checkout.Refresh(ctx); err != nil {
 		return fmt.Errorf("unable to refresh repo: %w", err)
 	}

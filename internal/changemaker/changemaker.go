@@ -15,6 +15,15 @@ type gitCommitter struct {
 	DefaultCommitOptions *git.CommitOptions
 }
 
+func ComitterFromConfig(config autobotcfg.ComitterConfig) (GitCommitter, error) {
+	return &gitCommitter{DefaultCommitOptions: &git.CommitOptions{
+		Author: &object.Signature{
+			Name:  config.AuthorName,
+			Email: config.AuthorEmail,
+		},
+	}}, nil
+}
+
 var _ GitCommitter = &gitCommitter{}
 
 func (g *gitCommitter) Commit(w *git.Worktree, msg string, opts *git.CommitOptions) (plumbing.Hash, error) {

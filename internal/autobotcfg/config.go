@@ -20,6 +20,12 @@ type AutobotConfig struct {
 	CloneDataDir        string
 	Repos               []RepoConfig
 	DefaultRemoteBranch string
+	ComitterConfig      ComitterConfig
+}
+
+type ComitterConfig struct {
+	AuthorName  string
+	AuthorEmail string
 }
 
 type GithubAppConfig struct {
