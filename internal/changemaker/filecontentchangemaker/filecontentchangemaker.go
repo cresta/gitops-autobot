@@ -50,7 +50,7 @@ func (g *gitFile) Name() string {
 
 var _ ReadableFile = &gitFile{}
 
-func (f *FileContentWorkingTreeChanger) ChangeWorkingTree(w git.Worktree, baseCommit *object.Commit, gitCommitter changemaker.GitCommitter) error {
+func (f *FileContentWorkingTreeChanger) ChangeWorkingTree(w *git.Worktree, baseCommit *object.Commit, gitCommitter changemaker.GitCommitter) error {
 	files, err := baseCommit.Files()
 	if err != nil {
 		return fmt.Errorf("unable to list files: %w", err)
@@ -91,8 +91,6 @@ func (f *FileContentWorkingTreeChanger) ChangeWorkingTree(w git.Worktree, baseCo
 			Hash:   baseCommit.Hash,
 			Branch: plumbing.NewBranchReferenceName(fmt.Sprintf("change_%d", idx)),
 			Create: true,
-			Force:  false,
-			Keep:   false,
 		}); err != nil {
 			return fmt.Errorf("unable to check out new branch: %w", err)
 		}

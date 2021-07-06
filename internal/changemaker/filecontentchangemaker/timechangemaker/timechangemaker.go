@@ -11,7 +11,7 @@ import (
 )
 
 type TimeWorkingTreeChanger struct {
-	Cfg autobotcfg.ChangeMakerConfig
+	Cfg autobotcfg.PerRepoChangeMakerConfig
 }
 
 func (t *TimeWorkingTreeChanger) NewContent(file filecontentchangemaker.ReadableFile) (*filecontentchangemaker.FileChange, error) {
@@ -42,17 +42,19 @@ func (t *TimeWorkingTreeChanger) NewContent(file filecontentchangemaker.Readable
 	return nil, nil
 }
 
-func TimeChangeMakerFactory(cfg autobotcfg.ChangeMakerConfig) ([]changemaker.WorkingTreeChanger, error) {
+func TimeChangeMakerFactory(cfg autobotcfg.ChangeMakerConfig, perRepo autobotcfg.PerRepoChangeMakerConfig) ([]changemaker.WorkingTreeChanger, error) {
 	if cfg.Name != "time" {
 		return nil, nil
 	}
 	return []changemaker.WorkingTreeChanger{
 		&filecontentchangemaker.FileContentWorkingTreeChanger{
 			ContentChangeCheck: &TimeWorkingTreeChanger{
-				Cfg: cfg,
+				Cfg: perRepo,
 			},
 		},
 	}, nil
 }
+
+var _ changemaker.WorkingTreeChangerFactory = TimeChangeMakerFactory
 
 var _ filecontentchangemaker.ContentChangeCheck = &TimeWorkingTreeChanger{}
