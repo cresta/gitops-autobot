@@ -10,28 +10,28 @@ import (
 )
 
 type AutobotPerRepoConfig struct {
-	ChangeMakers []PerRepoChangeMakerConfig
+	ChangeMakers []PerRepoChangeMakerConfig `yaml:"changeMakers"`
 }
 
 type AutobotConfig struct {
-	PRCreator           GithubAppConfig
-	PRReviewer          *GithubAppConfig
-	ChangeMakers        []ChangeMakerConfig
-	CloneDataDir        string
-	Repos               []RepoConfig
-	DefaultRemoteBranch string
-	ComitterConfig      ComitterConfig
+	PRCreator           GithubAppConfig     `yaml:"prCreator"`
+	PRReviewer          *GithubAppConfig    `yaml:"prReviewer"`
+	ChangeMakers        []ChangeMakerConfig `yaml:"changeMakers"`
+	CloneDataDir        string              `yaml:"cloneDataDir"`
+	Repos               []RepoConfig        `yaml:"repos"`
+	DefaultRemoteBranch string              `yaml:"defaultRemoteBranch"`
+	ComitterConfig      ComitterConfig      `yaml:"comitterConfig"`
 }
 
 type ComitterConfig struct {
-	AuthorName  string
-	AuthorEmail string
+	AuthorName  string `yaml:"authorName"`
+	AuthorEmail string `yaml:"authorEmail"`
 }
 
 type GithubAppConfig struct {
-	AppID          int64
-	InstallationID int64
-	PEMKeyLoc      string
+	AppID          int64  `yaml:"appID"`
+	InstallationID int64  `yaml:"installationID"`
+	PEMKeyLoc      string `yaml:"PEMKeyLoc"`
 }
 
 func (g *GithubAppConfig) Validate() error {
@@ -45,19 +45,19 @@ func (g *GithubAppConfig) Validate() error {
 }
 
 type RepoConfig struct {
-	Location string
-	Branch   string
+	Location string `yaml:"location"`
+	Branch   string `yaml:"branch"`
 }
 
 type PerRepoChangeMakerConfig struct {
-	Name           string
-	FileMatchRegex []string
-	AutoApprove    bool
+	Name           string   `yaml:"name"`
+	FileMatchRegex []string `yaml:"fileMatchRegex"`
+	AutoApprove    bool     `yaml:"autoApprove"`
 	regexp         []*regexp.Regexp
 }
 
 type ChangeMakerConfig struct {
-	Name string
+	Name string `yaml:"name"`
 }
 
 func (c *PerRepoChangeMakerConfig) Regex() []*regexp.Regexp {
@@ -89,6 +89,9 @@ func Load(cfg io.WriterTo) (*AutobotConfig, error) {
 	}
 	if ret.DefaultRemoteBranch == "" {
 		ret.DefaultRemoteBranch = "master"
+	}
+	if ret.CloneDataDir == "" {
+		ret.CloneDataDir = os.TempDir()
 	}
 	for idx := range ret.Repos {
 		if ret.Repos[idx].Branch == "" {

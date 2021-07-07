@@ -2,7 +2,9 @@ package filecontentchangemaker
 
 import (
 	"fmt"
+	"github.com/cresta/gitops-autobot/internal/autobotcfg"
 	"github.com/cresta/gitops-autobot/internal/changemaker"
+	"github.com/cresta/zapctx"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
@@ -11,6 +13,9 @@ import (
 
 type FileContentWorkingTreeChanger struct {
 	ContentChangeCheck ContentChangeCheck
+	Logger             *zapctx.Logger
+	Cfg                autobotcfg.ChangeMakerConfig
+	PerRepo            autobotcfg.PerRepoChangeMakerConfig
 }
 
 type ReadableFile interface {
@@ -57,6 +62,9 @@ func (f *FileContentWorkingTreeChanger) ChangeWorkingTree(w *git.Worktree, baseC
 	}
 	var allChanges []ExpectedChange
 	err = files.ForEach(func(file *object.File) error {
+		if !f.PerRepo.MatcheFile(file.Name) {
+			return nil
+		}
 		gf := gitFile{file: file}
 		fc, err := f.ContentChangeCheck.NewContent(&gf)
 		if err != nil {
@@ -109,7 +117,7 @@ func (f *FileContentWorkingTreeChanger) ChangeWorkingTree(w *git.Worktree, baseC
 				return fmt.Errorf("unable to git add file %s: %w", c.FileName, err)
 			}
 		}
-		if _, err := gitCommitter.Commit(w, s.CommitTitle+"\n\n"+s.CommitMessage, nil); err != nil {
+		if _, err := gitCommitter.Commit(w, s.CommitTitle+"\n\n"+s.CommitMessage, nil, f.Cfg, f.PerRepo); err != nil {
 			return fmt.Errorf("unable to run get commit: %w", err)
 		}
 	}

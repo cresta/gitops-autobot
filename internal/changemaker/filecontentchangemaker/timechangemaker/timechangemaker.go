@@ -11,13 +11,9 @@ import (
 )
 
 type TimeWorkingTreeChanger struct {
-	Cfg autobotcfg.PerRepoChangeMakerConfig
 }
 
 func (t *TimeWorkingTreeChanger) NewContent(file filecontentchangemaker.ReadableFile) (*filecontentchangemaker.FileChange, error) {
-	if !t.Cfg.MatcheFile(file.Name()) {
-		return nil, nil
-	}
 	var buf bytes.Buffer
 	if _, err := file.WriteTo(&buf); err != nil {
 		return nil, fmt.Errorf("unable to read from file %s: %w", file.Name(), err)
@@ -33,7 +29,7 @@ func (t *TimeWorkingTreeChanger) NewContent(file filecontentchangemaker.Readable
 	}
 	if hasChange {
 		return &filecontentchangemaker.FileChange{
-			NewContent:    nil,
+			NewContent:    strings.NewReader(strings.Join(lines, "\n")),
 			CommitTitle:   "time update",
 			CommitMessage: "Updated time to " + now.String(),
 			GroupHash:     "time",
@@ -48,9 +44,9 @@ func TimeChangeMakerFactory(cfg autobotcfg.ChangeMakerConfig, perRepo autobotcfg
 	}
 	return []changemaker.WorkingTreeChanger{
 		&filecontentchangemaker.FileContentWorkingTreeChanger{
-			ContentChangeCheck: &TimeWorkingTreeChanger{
-				Cfg: perRepo,
-			},
+			Cfg:                cfg,
+			PerRepo:            perRepo,
+			ContentChangeCheck: &TimeWorkingTreeChanger{},
 		},
 	}, nil
 }

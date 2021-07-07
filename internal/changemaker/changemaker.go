@@ -6,6 +6,7 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
+	"time"
 )
 
 type Commiter interface {
@@ -26,7 +27,8 @@ func ComitterFromConfig(config autobotcfg.ComitterConfig) (GitCommitter, error) 
 
 var _ GitCommitter = &gitCommitter{}
 
-func (g *gitCommitter) Commit(w *git.Worktree, msg string, opts *git.CommitOptions) (plumbing.Hash, error) {
+func (g *gitCommitter) Commit(w *git.Worktree, msg string, opts *git.CommitOptions, _ autobotcfg.ChangeMakerConfig, perRepo autobotcfg.PerRepoChangeMakerConfig) (plumbing.Hash, error) {
+	now := time.Now()
 	var co git.CommitOptions
 	if g.DefaultCommitOptions != nil {
 		co = *g.DefaultCommitOptions
@@ -46,11 +48,18 @@ func (g *gitCommitter) Commit(w *git.Worktree, msg string, opts *git.CommitOptio
 			co.Parents = opts.Parents
 		}
 	}
+	if co.Author != nil && co.Author.When.IsZero() {
+		co.Author.When = now
+	}
+	if co.Committer != nil && co.Committer.When.IsZero() {
+		co.Committer.When = now
+	}
+	msg = tagCommitMessage(msg, perRepo)
 	return w.Commit(msg, &co)
 }
 
 type GitCommitter interface {
-	Commit(w *git.Worktree, msg string, opts *git.CommitOptions) (plumbing.Hash, error)
+	Commit(w *git.Worktree, msg string, opts *git.CommitOptions, _ autobotcfg.ChangeMakerConfig, perRepo autobotcfg.PerRepoChangeMakerConfig) (plumbing.Hash, error)
 }
 
 type WorkingTreeChanger interface {
@@ -91,4 +100,11 @@ func (f *Factory) Load(ChangeMakers []autobotcfg.ChangeMakerConfig, repoCfg auto
 		}
 	}
 	return ret, nil
+}
+
+func tagCommitMessage(msg string, cfg autobotcfg.PerRepoChangeMakerConfig) string {
+	if cfg.AutoApprove {
+		msg += "\ngitops-autobot: auto-approve=true\n"
+	}
+	return msg
 }

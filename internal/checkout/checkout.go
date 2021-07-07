@@ -15,6 +15,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 	githttp "github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/google/go-github/v29/github"
+	"go.uber.org/zap"
 	"io"
 	"io/ioutil"
 	"os"
@@ -25,6 +26,7 @@ type Checkout struct {
 	RepoConfig autobotcfg.RepoConfig
 	Auth       githttp.AuthMethod
 	Repo       *git.Repository
+	Logger     *zapctx.Logger
 }
 
 func NewCheckout(ctx context.Context, logger *zapctx.Logger, cfg autobotcfg.RepoConfig, cloneDataDirectory string, transport *ghinstallation.Transport) (*Checkout, error) {
@@ -34,6 +36,7 @@ func NewCheckout(ctx context.Context, logger *zapctx.Logger, cfg autobotcfg.Repo
 			Logger: logger,
 			Itr:    transport,
 		},
+		Logger: logger,
 	}
 	into, err := ioutil.TempDir(cloneDataDirectory, "checkout")
 	if err != nil {
@@ -45,7 +48,7 @@ func NewCheckout(ctx context.Context, logger *zapctx.Logger, cfg autobotcfg.Repo
 		Auth:          ch.Auth,
 		Progress:      &progress,
 		SingleBranch:  true,
-		ReferenceName: plumbing.NewRemoteReferenceName("origin", cfg.Branch),
+		ReferenceName: plumbing.NewBranchReferenceName(cfg.Branch),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("unable to do initial clone of %s: %w", cfg.Location, err)
@@ -55,21 +58,34 @@ func NewCheckout(ctx context.Context, logger *zapctx.Logger, cfg autobotcfg.Repo
 }
 
 func (c *Checkout) Refresh(ctx context.Context) error {
-	if err := c.Repo.FetchContext(ctx, &git.FetchOptions{
-		Auth: c.Auth,
-	}); err != nil && !errors.Is(err, git.NoErrAlreadyUpToDate) {
-		return fmt.Errorf("unable to fetch update: %w", err)
+	remotes, err := c.Repo.Remotes()
+	if err != nil {
+		return fmt.Errorf("unable to list remotes: %w", err)
+	}
+	for _, r := range remotes {
+		if err := r.FetchContext(ctx, &git.FetchOptions{
+			Auth: c.Auth,
+		}); err != nil && !errors.Is(err, git.NoErrAlreadyUpToDate) {
+			return fmt.Errorf("unable to fetch from remote %s: %w", r.Config().Name, err)
+		}
 	}
 	return nil
 }
 
+const gitopsAutobotDefaultBranch = "gitops-autobot-start"
+
 func (c *Checkout) Clean(ctx context.Context) error {
-	w, err := c.Repo.Worktree()
+	c.Logger.Debug(ctx, "cleaning")
+	w, base, err := c.SetupForWorkingTreeChanger()
 	if err != nil {
-		return fmt.Errorf("unable to get working tree: %w", err)
+		return fmt.Errorf("unable to setup for cleaning: %w", err)
+	}
+	if err := c.Repo.Storer.SetReference(plumbing.NewHashReference(plumbing.NewBranchReferenceName(gitopsAutobotDefaultBranch), base.Hash)); err != nil {
+		return fmt.Errorf("unable to set new branch ref: %w", err)
 	}
 	if err := w.Reset(&git.ResetOptions{
-		Mode: git.HardReset,
+		Mode:   git.HardReset,
+		Commit: base.Hash,
 	}); err != nil {
 		return fmt.Errorf("unable to reset working tree: %w", err)
 	}
@@ -78,29 +94,35 @@ func (c *Checkout) Clean(ctx context.Context) error {
 	}); err != nil {
 		return fmt.Errorf("unable to clean working tree: %w", err)
 	}
+	a, b := c.Repo.Config()
+	_, _ = a, b
+	if err := w.Checkout(&git.CheckoutOptions{
+		Branch: plumbing.NewBranchReferenceName(gitopsAutobotDefaultBranch),
+	}); err != nil && !errors.Is(err, git.ErrBranchExists) {
+		return fmt.Errorf("unable to check out new branch: %w", err)
+	}
+	if err := w.Reset(&git.ResetOptions{
+		Mode:   git.HardReset,
+		Commit: base.Hash,
+	}); err != nil {
+		return fmt.Errorf("unable to reset working tree: %w", err)
+	}
 	bItr, err := c.Repo.Branches()
 	if err != nil {
 		return fmt.Errorf("unable to get branch iterator: %w", err)
 	}
+	defer bItr.Close()
 	if err := bItr.ForEach(func(reference *plumbing.Reference) error {
-		if err := c.Repo.DeleteBranch(reference.Name().String()); err != nil {
-			return fmt.Errorf("unable to delete local branch %s: %w", reference.Name().String(), err)
+		if reference.Name().Short() == gitopsAutobotDefaultBranch {
+			return nil
+		}
+		c.Logger.Debug(ctx, "deleting a branch", zap.String("branch", reference.String()))
+		if err := c.Repo.Storer.RemoveReference(reference.Name()); err != nil {
+			return fmt.Errorf("unable to remove ref %s: %w", reference.Name().String(), err)
 		}
 		return nil
 	}); err != nil {
-		return fmt.Errorf("unable to clean all branches: %w", err)
-	}
-	refName := plumbing.NewRemoteReferenceName("origin", c.RepoConfig.Branch)
-	ref, err := c.Repo.Reference(refName, true)
-	if err != nil {
-		return fmt.Errorf("unable to find remote reference: %w", err)
-	}
-	if err := w.Checkout(&git.CheckoutOptions{
-		Hash:   ref.Hash(),
-		Branch: plumbing.NewBranchReferenceName("setup"),
-		Create: true,
-	}); err != nil {
-		return fmt.Errorf("unable to check out new branch: %w", err)
+		return fmt.Errorf("unable to iterate branches")
 	}
 	return nil
 }
@@ -123,10 +145,14 @@ func (c *Checkout) CurrentConfig() (*autobotcfg.AutobotPerRepoConfig, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to load per repo config: %w", err)
 	}
+	defer func() {
+		c.Logger.IfErr(f.Close()).Warn(context.Background(), "unable to close opened config file")
+	}()
 	var buf bytes.Buffer
-	if _, err := io.Copy(f, &buf); err != nil {
+	if _, err := io.Copy(&buf, f); err != nil {
 		return nil, fmt.Errorf("unable to read data from config file: %w", err)
 	}
+	c.Logger.Debug(context.Background(), "repo config", zap.String("cfg", buf.String()))
 	cfg, err := autobotcfg.LoadPerRepoConfig(&buf)
 	if err != nil {
 		return nil, fmt.Errorf("unable to load repo config: %w", err)
@@ -164,46 +190,88 @@ func (c *Checkout) githubOwnerRepo() (string, string, error) {
 }
 
 func (c *Checkout) PushAllNewBranches(ctx context.Context, client *github.Client) error {
+	var branchesToPush []config.RefSpec
 	bItr, err := c.Repo.Branches()
 	if err != nil {
-		return fmt.Errorf("unable to get local branches: %w", err)
+		return fmt.Errorf("unable to get branch iterator: %w", err)
 	}
-	var branchesToPush []config.RefSpec
+	defer bItr.Close()
+	toPushToPr := make(map[config.RefSpec]*github.NewPullRequest)
 	if err := bItr.ForEach(func(reference *plumbing.Reference) error {
-		if reference.Name().IsRemote() {
+		if reference.Name().Short() == gitopsAutobotDefaultBranch {
 			return nil
 		}
-		if reference.Name().Short() == "setup" {
-			return nil
+		commitObj, err := c.Repo.CommitObject(reference.Hash())
+		if err != nil {
+			return fmt.Errorf("unable to find commit object for branch %s: %w", reference.Name().String(), err)
 		}
-		// Push this branch and make a PR out of it
-		branchesToPush = append(branchesToPush, config.RefSpec(reference.Name()+":"+reference.Name()))
+		refSpec := config.RefSpec(reference.Name().String() + ":" + reference.Name().String())
+		toPushToPr[refSpec] = extractGithubTitleAndMsg(commitObj.Message, reference.Name().Short())
+		c.Logger.Debug(ctx, "pushing a branch", zap.String("branch", reference.String()))
+		branchesToPush = append(branchesToPush, refSpec)
 		return nil
 	}); err != nil {
 		return fmt.Errorf("unable to iterate branches")
 	}
+	c.Logger.Debug(ctx, "pushing new branches", zap.Any("all_branches", branchesToPush))
 	owner, repo, err := c.githubOwnerRepo()
 	if err != nil {
 		return fmt.Errorf("unable to parse repo: %w", err)
 	}
 	for _, b := range branchesToPush {
+		// Fetch commit object to build github PR message
 		err = c.Repo.PushContext(ctx, &git.PushOptions{
+			RemoteName: "origin",
 			RefSpecs: []config.RefSpec{
 				b,
 			},
 			Auth: c.Auth,
 		})
 		if err != nil {
+			if strings.HasPrefix(err.Error(), "non-fast-forward update") {
+				c.Logger.Debug(ctx, "non fast forward update for branch and assumed it is already in PR", zap.String("branch", b.String()))
+				continue
+			}
 			return fmt.Errorf("unable to push to remote branch %s: %w", b, err)
 		}
-		pr, resp, err := client.PullRequests.Create(ctx, owner, repo, &github.NewPullRequest{
-			Head: github.String(b.Reverse().Src()),
-			Base: &c.RepoConfig.Branch,
-		})
+		prObj := toPushToPr[b]
+		if prObj == nil {
+			prObj = &github.NewPullRequest{}
+		}
+		prObj.Base = &c.RepoConfig.Branch
+		prObj.Head = github.String(b.Reverse().Src())
+		pr, resp, err := client.PullRequests.Create(ctx, owner, repo, prObj)
 		if err != nil {
+			if strings.HasPrefix(err.Error(), "non-fast-forward update") {
+			}
 			return fmt.Errorf("unable to create PR for new push: %w", err)
 		}
 		_, _ = pr, resp
 	}
 	return nil
+}
+
+func truncateString(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[0:maxLen]
+}
+
+func extractGithubTitleAndMsg(message string, branchName string) *github.NewPullRequest {
+	parts := strings.SplitN(message, "\n", 2)
+	if len(parts) == 0 {
+		return &github.NewPullRequest{
+			Title: github.String("Commit to branch " + branchName),
+		}
+	}
+	if len(parts) == 1 {
+		return &github.NewPullRequest{
+			Title: github.String(truncateString(strings.TrimSpace(message), 75)),
+		}
+	}
+	return &github.NewPullRequest{
+		Title: github.String(truncateString(strings.TrimSpace(parts[0]), 75)),
+		Body:  github.String(strings.TrimSpace(parts[1])),
+	}
 }

@@ -1,6 +1,7 @@
 package ghapp
 
 import (
+	"context"
 	"fmt"
 	"github.com/bradleyfalzon/ghinstallation"
 	"github.com/cresta/gitops-autobot/internal/autobotcfg"
@@ -9,8 +10,16 @@ import (
 	http2 "net/http"
 )
 
-func NewFromConfig(cfg autobotcfg.GithubAppConfig, rt http2.RoundTripper) (*ghinstallation.Transport, error) {
-	return ghinstallation.NewKeyFromFile(rt, cfg.AppID, cfg.InstallationID, cfg.PEMKeyLoc)
+func NewFromConfig(ctx context.Context, cfg autobotcfg.GithubAppConfig, rt http2.RoundTripper) (*ghinstallation.Transport, error) {
+	trans, err := ghinstallation.NewKeyFromFile(rt, cfg.AppID, cfg.InstallationID, cfg.PEMKeyLoc)
+	if err != nil {
+		return nil, fmt.Errorf("unable to find key file: %w", err)
+	}
+	_, err = trans.Token(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to validate token: %w", err)
+	}
+	return trans, nil
 }
 
 type DynamicHttpAuthMethod struct {

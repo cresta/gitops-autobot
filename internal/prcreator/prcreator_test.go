@@ -11,13 +11,20 @@ import (
 	"github.com/cresta/zapctx/testhelp/testhelp"
 	"github.com/google/go-github/v29/github"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 	"io"
+	"io/ioutil"
 	http2 "net/http"
 	"os"
 	"testing"
 )
 
 func TestPrCreator_Execute(t *testing.T) {
+	td, err := ioutil.TempDir("", "TestPrCreator_Execute")
+	require.NoError(t, err)
+	defer func() {
+		//require.NoError(t, os.RemoveAll(td))
+	}()
 	ctx := context.Background()
 	logger := testhelp.ZapTestingLogger(t)
 	factory := changemaker.Factory{
@@ -36,10 +43,12 @@ func TestPrCreator_Execute(t *testing.T) {
 	require.NoError(t, err)
 	cfg, err := autobotcfg.Load(&buf)
 	require.NoError(t, err)
+	cfg.CloneDataDir = td
+	logger.Info(ctx, "loaded config", zap.Any("config", cfg))
 
 	comitter, err := changemaker.ComitterFromConfig(cfg.ComitterConfig)
 	require.NoError(t, err)
-	trans, err := ghapp.NewFromConfig(cfg.PRCreator, http2.DefaultTransport)
+	trans, err := ghapp.NewFromConfig(ctx, cfg.PRCreator, http2.DefaultTransport)
 	require.NoError(t, err)
 
 	var allCheckouts []*checkout.Checkout
