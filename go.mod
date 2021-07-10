@@ -16,6 +16,7 @@ require (
 	github.com/google/go-github/v29 v29.0.3
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/gorilla/mux v1.8.0
+	github.com/hasura/go-graphql-client v0.2.0
 	github.com/kevinburke/ssh_config v1.1.0 // indirect
 	github.com/sergi/go-diff v1.2.0 // indirect
 	github.com/signalfx/golib/v3 v3.3.34

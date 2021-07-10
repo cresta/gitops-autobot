@@ -7,20 +7,26 @@ import (
 	"io"
 	"os"
 	"regexp"
+	"strings"
+	"time"
 )
 
 type AutobotPerRepoConfig struct {
-	ChangeMakers []PerRepoChangeMakerConfig `yaml:"changeMakers"`
+	ChangeMakers              []PerRepoChangeMakerConfig `yaml:"changeMakers"`
+	AllowAutoReview           bool                       `yaml:"allowAutoReview"`
+	AllowUsersToTriggerAccept bool                       `yaml:"allowUsersToTriggerAccept"`
+	AllowAutoMerge            bool                       `yaml:"allowAutoMerge"`
 }
 
 type AutobotConfig struct {
-	PRCreator           GithubAppConfig     `yaml:"prCreator"`
-	PRReviewer          *GithubAppConfig    `yaml:"prReviewer"`
-	ChangeMakers        []ChangeMakerConfig `yaml:"changeMakers"`
-	CloneDataDir        string              `yaml:"cloneDataDir"`
-	Repos               []RepoConfig        `yaml:"repos"`
-	DefaultRemoteBranch string              `yaml:"defaultRemoteBranch"`
-	ComitterConfig      ComitterConfig      `yaml:"comitterConfig"`
+	PRCreator            GithubAppConfig     `yaml:"prCreator"`
+	PRReviewer           *GithubAppConfig    `yaml:"prReviewer"`
+	ChangeMakers         []ChangeMakerConfig `yaml:"changeMakers"`
+	CloneDataDir         string              `yaml:"cloneDataDir"`
+	Repos                []RepoConfig        `yaml:"repos"`
+	DefaultRemoteBranch  string              `yaml:"defaultRemoteBranch"`
+	ComitterConfig       ComitterConfig      `yaml:"comitterConfig"`
+	DelayForAutoApproval time.Duration       `yaml:"delayForAutoApproval"`
 }
 
 type ComitterConfig struct {
@@ -32,6 +38,11 @@ type GithubAppConfig struct {
 	AppID          int64  `yaml:"appID"`
 	InstallationID int64  `yaml:"installationID"`
 	PEMKeyLoc      string `yaml:"PEMKeyLoc"`
+	Name           string `yaml:"name"`
+}
+
+func (g GithubAppConfig) MatchesLogin(s string) bool {
+	return g.Name == s || g.Name+"[bot]" == s
 }
 
 func (g *GithubAppConfig) Validate() error {
@@ -47,6 +58,18 @@ func (g *GithubAppConfig) Validate() error {
 type RepoConfig struct {
 	Location string `yaml:"location"`
 	Branch   string `yaml:"branch"`
+}
+
+func (r *RepoConfig) GithubOwnerRepo() (string, string, error) {
+	loc := r.Location
+	//https://github.com/cep21/circuit.git
+	loc = strings.TrimPrefix(loc, "https://github.com/")
+	loc = strings.TrimSuffix(loc, ".git")
+	parts := strings.Split(loc, "/")
+	if len(parts) != 2 {
+		return "", "", fmt.Errorf("unable to parse remote %s", r.Location)
+	}
+	return parts[0], parts[1], nil
 }
 
 type PerRepoChangeMakerConfig struct {
@@ -89,6 +112,9 @@ func Load(cfg io.WriterTo) (*AutobotConfig, error) {
 	}
 	if ret.DefaultRemoteBranch == "" {
 		ret.DefaultRemoteBranch = "master"
+	}
+	if ret.DelayForAutoApproval == 0 {
+		ret.DelayForAutoApproval = time.Minute
 	}
 	if ret.CloneDataDir == "" {
 		ret.CloneDataDir = os.TempDir()

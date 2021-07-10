@@ -177,18 +177,6 @@ func (c *Checkout) SetupForWorkingTreeChanger() (*git.Worktree, *object.Commit, 
 	return w, commitObj, nil
 }
 
-func (c *Checkout) githubOwnerRepo() (string, string, error) {
-	loc := c.RepoConfig.Location
-	//https://github.com/cep21/circuit.git
-	loc = strings.TrimPrefix(loc, "https://github.com/")
-	loc = strings.TrimSuffix(loc, ".git")
-	parts := strings.Split(loc, "/")
-	if len(parts) != 2 {
-		return "", "", fmt.Errorf("unable to parse remote %s", c.RepoConfig.Location)
-	}
-	return parts[0], parts[1], nil
-}
-
 func (c *Checkout) PushAllNewBranches(ctx context.Context, client *github.Client) error {
 	var branchesToPush []config.RefSpec
 	bItr, err := c.Repo.Branches()
@@ -214,7 +202,7 @@ func (c *Checkout) PushAllNewBranches(ctx context.Context, client *github.Client
 		return fmt.Errorf("unable to iterate branches")
 	}
 	c.Logger.Debug(ctx, "pushing new branches", zap.Any("all_branches", branchesToPush))
-	owner, repo, err := c.githubOwnerRepo()
+	owner, repo, err := c.RepoConfig.GithubOwnerRepo()
 	if err != nil {
 		return fmt.Errorf("unable to parse repo: %w", err)
 	}
