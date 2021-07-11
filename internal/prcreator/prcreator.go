@@ -6,8 +6,8 @@ import (
 	"github.com/cresta/gitops-autobot/internal/autobotcfg"
 	"github.com/cresta/gitops-autobot/internal/changemaker"
 	"github.com/cresta/gitops-autobot/internal/checkout"
+	"github.com/cresta/gitops-autobot/internal/ghapp"
 	"github.com/cresta/zapctx"
-	"github.com/google/go-github/v29/github"
 )
 
 type PrCreator struct {
@@ -15,7 +15,7 @@ type PrCreator struct {
 	AutobotConfig *autobotcfg.AutobotConfig
 	Logger        *zapctx.Logger
 	GitCommitter  changemaker.GitCommitter
-	Client        *github.Client
+	Client        *ghapp.GithubAPI
 }
 
 func (p *PrCreator) Execute(ctx context.Context, checkout *checkout.Checkout) error {

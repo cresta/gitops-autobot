@@ -38,11 +38,6 @@ type GithubAppConfig struct {
 	AppID          int64  `yaml:"appID"`
 	InstallationID int64  `yaml:"installationID"`
 	PEMKeyLoc      string `yaml:"PEMKeyLoc"`
-	Name           string `yaml:"name"`
-}
-
-func (g GithubAppConfig) MatchesLogin(s string) bool {
-	return g.Name == s || g.Name+"[bot]" == s
 }
 
 func (g *GithubAppConfig) Validate() error {
@@ -76,6 +71,7 @@ type PerRepoChangeMakerConfig struct {
 	Name           string   `yaml:"name"`
 	FileMatchRegex []string `yaml:"fileMatchRegex"`
 	AutoApprove    bool     `yaml:"autoApprove"`
+	AutoMerge      bool     `yaml:"autoMerge"`
 	regexp         []*regexp.Regexp
 }
 

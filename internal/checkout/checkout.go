@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/bradleyfalzon/ghinstallation"
 	"github.com/cresta/gitops-autobot/internal/autobotcfg"
 	"github.com/cresta/gitops-autobot/internal/ghapp"
 	"github.com/cresta/zapctx"
@@ -13,8 +12,9 @@ import (
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
-	githttp "github.com/go-git/go-git/v5/plumbing/transport/http"
+	"github.com/go-git/go-git/v5/plumbing/transport"
 	"github.com/google/go-github/v29/github"
+	"github.com/shurcooL/githubv4"
 	"go.uber.org/zap"
 	"io"
 	"io/ioutil"
@@ -24,19 +24,16 @@ import (
 
 type Checkout struct {
 	RepoConfig autobotcfg.RepoConfig
-	Auth       githttp.AuthMethod
+	auth       transport.AuthMethod
 	Repo       *git.Repository
 	Logger     *zapctx.Logger
 }
 
-func NewCheckout(ctx context.Context, logger *zapctx.Logger, cfg autobotcfg.RepoConfig, cloneDataDirectory string, transport *ghinstallation.Transport) (*Checkout, error) {
+func NewCheckout(ctx context.Context, logger *zapctx.Logger, cfg autobotcfg.RepoConfig, cloneDataDirectory string, auth transport.AuthMethod) (*Checkout, error) {
 	ch := Checkout{
 		RepoConfig: cfg,
-		Auth: &ghapp.DynamicHttpAuthMethod{
-			Logger: logger,
-			Itr:    transport,
-		},
-		Logger: logger,
+		auth:       auth,
+		Logger:     logger,
 	}
 	into, err := ioutil.TempDir(cloneDataDirectory, "checkout")
 	if err != nil {
@@ -45,7 +42,7 @@ func NewCheckout(ctx context.Context, logger *zapctx.Logger, cfg autobotcfg.Repo
 	var progress bytes.Buffer
 	repo, err := git.PlainCloneContext(ctx, into, false, &git.CloneOptions{
 		URL:           cfg.Location,
-		Auth:          ch.Auth,
+		Auth:          ch.auth,
 		Progress:      &progress,
 		SingleBranch:  true,
 		ReferenceName: plumbing.NewBranchReferenceName(cfg.Branch),
@@ -64,7 +61,7 @@ func (c *Checkout) Refresh(ctx context.Context) error {
 	}
 	for _, r := range remotes {
 		if err := r.FetchContext(ctx, &git.FetchOptions{
-			Auth: c.Auth,
+			Auth: c.auth,
 		}); err != nil && !errors.Is(err, git.NoErrAlreadyUpToDate) {
 			return fmt.Errorf("unable to fetch from remote %s: %w", r.Config().Name, err)
 		}
@@ -177,7 +174,7 @@ func (c *Checkout) SetupForWorkingTreeChanger() (*git.Worktree, *object.Commit, 
 	return w, commitObj, nil
 }
 
-func (c *Checkout) PushAllNewBranches(ctx context.Context, client *github.Client) error {
+func (c *Checkout) PushAllNewBranches(ctx context.Context, client *ghapp.GithubAPI) error {
 	var branchesToPush []config.RefSpec
 	bItr, err := c.Repo.Branches()
 	if err != nil {
@@ -206,6 +203,10 @@ func (c *Checkout) PushAllNewBranches(ctx context.Context, client *github.Client
 	if err != nil {
 		return fmt.Errorf("unable to parse repo: %w", err)
 	}
+	repoInfo, queryErr := client.RepositoryInfo(ctx, owner, repo)
+	if queryErr != nil {
+		return fmt.Errorf("unable to execute graphql query: %w", err)
+	}
 	for _, b := range branchesToPush {
 		// Fetch commit object to build github PR message
 		err = c.Repo.PushContext(ctx, &git.PushOptions{
@@ -213,7 +214,7 @@ func (c *Checkout) PushAllNewBranches(ctx context.Context, client *github.Client
 			RefSpecs: []config.RefSpec{
 				b,
 			},
-			Auth: c.Auth,
+			Auth: c.auth,
 		})
 		if err != nil {
 			if strings.HasPrefix(err.Error(), "non-fast-forward update") {
@@ -228,13 +229,15 @@ func (c *Checkout) PushAllNewBranches(ctx context.Context, client *github.Client
 		}
 		prObj.Base = &c.RepoConfig.Branch
 		prObj.Head = github.String(b.Reverse().Src())
-		pr, resp, err := client.PullRequests.Create(ctx, owner, repo, prObj)
-		if err != nil {
-			if strings.HasPrefix(err.Error(), "non-fast-forward update") {
-			}
+		if _, err := client.CreatePullRequest(ctx, &githubv4.CreatePullRequestInput{
+			RepositoryID: repoInfo.Repository.Id,
+			BaseRefName:  "main",
+			HeadRefName:  githubv4.String(b.Src()),
+			Title:        githubv4.String(*prObj.Title),
+			Body:         githubv4.NewString(githubv4.String(*prObj.Body)),
+		}); err != nil {
 			return fmt.Errorf("unable to create PR for new push: %w", err)
 		}
-		_, _ = pr, resp
 	}
 	return nil
 }

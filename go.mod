@@ -19,6 +19,8 @@ require (
 	github.com/hasura/go-graphql-client v0.2.0
 	github.com/kevinburke/ssh_config v1.1.0 // indirect
 	github.com/sergi/go-diff v1.2.0 // indirect
+	github.com/shurcooL/githubv4 v0.0.0-20201206200315-234843c633fa
+	github.com/shurcooL/graphql v0.0.0-20200928012149-18c5c3165e3a // indirect
 	github.com/signalfx/golib/v3 v3.3.34
 	github.com/stretchr/testify v1.7.0
 	github.com/tinylib/msgp v1.1.6 // indirect

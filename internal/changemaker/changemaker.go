@@ -106,5 +106,8 @@ func tagCommitMessage(msg string, cfg autobotcfg.PerRepoChangeMakerConfig) strin
 	if cfg.AutoApprove {
 		msg += "\ngitops-autobot: auto-approve=true\n"
 	}
+	if cfg.AutoMerge {
+		msg += "\ngitops-autobot: auto-merge=true\n"
+	}
 	return msg
 }

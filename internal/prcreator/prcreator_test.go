@@ -9,7 +9,6 @@ import (
 	"github.com/cresta/gitops-autobot/internal/checkout"
 	"github.com/cresta/gitops-autobot/internal/ghapp"
 	"github.com/cresta/zapctx/testhelp/testhelp"
-	"github.com/google/go-github/v29/github"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"io"
@@ -23,7 +22,7 @@ func TestPrCreator_Execute(t *testing.T) {
 	td, err := ioutil.TempDir("", "TestPrCreator_Execute")
 	require.NoError(t, err)
 	defer func() {
-		//require.NoError(t, os.RemoveAll(td))
+		require.NoError(t, os.RemoveAll(td))
 	}()
 	ctx := context.Background()
 	logger := testhelp.ZapTestingLogger(t)
@@ -48,17 +47,15 @@ func TestPrCreator_Execute(t *testing.T) {
 
 	comitter, err := changemaker.ComitterFromConfig(cfg.ComitterConfig)
 	require.NoError(t, err)
-	trans, err := ghapp.NewFromConfig(ctx, cfg.PRCreator, http2.DefaultTransport)
+	client, err := ghapp.NewFromConfig(ctx, cfg.PRCreator, http2.DefaultTransport, logger)
 	require.NoError(t, err)
 
 	var allCheckouts []*checkout.Checkout
 	for _, repo := range cfg.Repos {
-		co, err := checkout.NewCheckout(ctx, logger, repo, cfg.CloneDataDir, trans)
+		co, err := checkout.NewCheckout(ctx, logger, repo, cfg.CloneDataDir, client.GoGetAuthMethod())
 		require.NoError(t, err)
 		allCheckouts = append(allCheckouts, co)
 	}
-
-	client := github.NewClient(&http2.Client{Transport: trans})
 
 	require.NoError(t, err)
 

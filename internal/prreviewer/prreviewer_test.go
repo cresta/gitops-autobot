@@ -6,7 +6,6 @@ import (
 	"github.com/cresta/gitops-autobot/internal/autobotcfg"
 	"github.com/cresta/gitops-autobot/internal/ghapp"
 	"github.com/cresta/zapctx/testhelp/testhelp"
-	"github.com/google/go-github/v29/github"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"io"
@@ -35,9 +34,7 @@ func TestPrReviewer_Execute(t *testing.T) {
 		t.Log("no reviewer config set.  Skipping test")
 	}
 
-	trans, err := ghapp.NewFromConfig(ctx, *cfg.PRReviewer, http2.DefaultTransport)
-	require.NoError(t, err)
-	client := github.NewClient(&http2.Client{Transport: trans})
+	client, err := ghapp.NewFromConfig(ctx, *cfg.PRReviewer, http2.DefaultTransport, logger)
 	require.NoError(t, err)
 
 	pr := PrReviewer{

@@ -8,12 +8,12 @@ import (
 	"github.com/cresta/zapctx"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/google/go-github/v29/github"
-	"go.uber.org/zap"
+	"github.com/shurcooL/githubv4"
 	http2 "net/http"
 	"strings"
 )
 
-func NewFromConfig(ctx context.Context, cfg autobotcfg.GithubAppConfig, rt http2.RoundTripper) (*ghinstallation.Transport, error) {
+func NewFromConfig(ctx context.Context, cfg autobotcfg.GithubAppConfig, rt http2.RoundTripper, logger *zapctx.Logger) (*GithubAPI, error) {
 	trans, err := ghinstallation.NewKeyFromFile(rt, cfg.AppID, cfg.InstallationID, cfg.PEMKeyLoc)
 	if err != nil {
 		return nil, fmt.Errorf("unable to find key file: %w", err)
@@ -22,70 +22,69 @@ func NewFromConfig(ctx context.Context, cfg autobotcfg.GithubAppConfig, rt http2
 	if err != nil {
 		return nil, fmt.Errorf("unable to validate token: %w", err)
 	}
-	return trans, nil
+	gql := githubv4.NewClient(&http2.Client{Transport: trans})
+	client := github.NewClient(&http2.Client{Transport: trans})
+	return &GithubAPI{
+		clientV3:  client,
+		clientV4:  gql,
+		transport: trans,
+		logger:    logger,
+	}, nil
 }
 
-type DynamicHttpAuthMethod struct {
-	Itr    *ghinstallation.Transport
-	Logger *zapctx.Logger
+type GithubAPI struct {
+	clientV3  *github.Client
+	clientV4  *githubv4.Client
+	transport *ghinstallation.Transport
+	logger    *zapctx.Logger
 }
 
-const ghAppUserName = "x-access-token"
-
-func (d *DynamicHttpAuthMethod) String() string {
-	return fmt.Sprintf("%s - %s:%s", d.Name(), ghAppUserName, "******")
+type RepositoryInfo struct {
+	Repository struct {
+		Id githubv4.ID
+	} `graphql:"repository(owner: $owner, name: $name)"`
 }
 
-func (d *DynamicHttpAuthMethod) Name() string {
-	return "dynamic-http-basic-auth"
-}
-
-func (d *DynamicHttpAuthMethod) SetAuth(r *http2.Request) {
-	if d == nil {
-		return
+func (g *GithubAPI) RepositoryInfo(ctx context.Context, owner string, name string) (*RepositoryInfo, error) {
+	var repoInfo RepositoryInfo
+	if err := g.clientV4.Query(ctx, &repoInfo, map[string]interface{}{
+		"owner": githubv4.String(owner),
+		"name":  githubv4.String(name),
+	}); err != nil {
+		return nil, fmt.Errorf("unable to query graphql for repository info: %w", err)
 	}
-	tok, err := d.Itr.Token(r.Context())
-	if err != nil {
-		d.Logger.IfErr(err).Error(r.Context(), "unable to get github token")
-		return
-	}
-	r.SetBasicAuth(ghAppUserName, tok)
+	return &repoInfo, nil
 }
 
-var _ http.AuthMethod = &DynamicHttpAuthMethod{}
+type CreatePullRequest struct {
+	CreatePullRequest struct {
+		// Note: This is unused, but the library requires at least something to be read for the mutation to happen
+		ClientMutationId githubv4.ID
+	} `graphql:"createPullRequest(input: $input)"`
+}
 
-func EveryPullRequest(ctx context.Context, client *github.Client, repoCfg autobotcfg.RepoConfig) ([]*github.PullRequest, error) {
-	owner, repo, err := repoCfg.GithubOwnerRepo()
-	if err != nil {
-		return nil, fmt.Errorf("unable to parse repository: %w", err)
+func (g *GithubAPI) CreatePullRequest(ctx context.Context, in *githubv4.CreatePullRequestInput) (*CreatePullRequest, error) {
+	var ret CreatePullRequest
+	if err := g.clientV4.Mutate(ctx, &ret, in, nil); err != nil {
+		return nil, fmt.Errorf("unable to mutate graphql for pull request: %w", err)
 	}
-	var ret []*github.PullRequest
-	nextPage := 0
-	for {
-		prs, resp, err := client.PullRequests.List(ctx, owner, repo, &github.PullRequestListOptions{
-			Sort: "updated",
-			ListOptions: github.ListOptions{
-				PerPage: 100,
-				Page:    nextPage,
-			},
-		})
-		if err != nil {
-			return nil, fmt.Errorf("uanble to list PRs: %w", err)
-		}
-		ret = append(ret, prs...)
-		if resp.NextPage == 0 {
-			return ret, nil
-		}
-		nextPage = resp.NextPage
+	return &ret, nil
+}
+
+func (g *GithubAPI) GoGetAuthMethod() http.AuthMethod {
+	return &dynamicAuthMethod{
+		Itr:    g.transport,
+		Logger: g.logger,
 	}
 }
 
-func FetchMasterConfigFile(ctx context.Context, client *github.Client, r autobotcfg.RepoConfig) (*autobotcfg.AutobotPerRepoConfig, error) {
+func (g *GithubAPI) FetchMasterConfigFile(ctx context.Context, r autobotcfg.RepoConfig) (*autobotcfg.AutobotPerRepoConfig, error) {
+	// Note: Cannot find a way to do this with GraphQL
 	owner, repo, err := r.GithubOwnerRepo()
 	if err != nil {
 		return nil, fmt.Errorf("unable to fetch repo owner: %w", err)
 	}
-	content, _, _, err := client.Repositories.GetContents(ctx, owner, repo, ".gitops-autobot", &github.RepositoryContentGetOptions{})
+	content, _, _, err := g.clientV3.Repositories.GetContents(ctx, owner, repo, ".gitops-autobot", &github.RepositoryContentGetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("unable to fetch content: %w", err)
 	}
@@ -100,43 +99,164 @@ func FetchMasterConfigFile(ctx context.Context, client *github.Client, r autobot
 	return ret, nil
 }
 
-func AllChecksPass(ctx context.Context, pr *github.PullRequest, logger *zapctx.Logger, client *github.Client) (bool, error) {
-	if pr.GetHead().GetRepo().GetOwner().GetLogin() == "" {
-		return false, fmt.Errorf("uanble to find owner's name of pr")
+type dynamicAuthMethod struct {
+	Itr    *ghinstallation.Transport
+	Logger *zapctx.Logger
+}
+
+const ghAppUserName = "x-access-token"
+
+func (d *dynamicAuthMethod) String() string {
+	return fmt.Sprintf("%s - %s:%s", d.Name(), ghAppUserName, "******")
+}
+
+func (d *dynamicAuthMethod) Name() string {
+	return "dynamic-http-basic-auth"
+}
+
+func (d *dynamicAuthMethod) SetAuth(r *http2.Request) {
+	if d == nil {
+		return
 	}
-	if pr.GetHead().GetRepo().GetName() == "" {
-		return false, fmt.Errorf("unable to get the pr's repo")
-	}
-	if pr.GetNumber() == 0 {
-		return false, fmt.Errorf("no pr number set")
-	}
-	owner, repo := pr.GetHead().GetRepo().GetOwner().GetLogin(), pr.GetHead().GetRepo().GetName()
-	checks, _, err := client.Checks.ListCheckRunsForRef(ctx, owner, repo, pr.GetHead().GetRef(), &github.ListCheckRunsOptions{
-		// TODO: Is it worth listing all pages?
-		ListOptions: github.ListOptions{
-			PerPage: 100,
-		},
-	})
+	tok, err := d.Itr.Token(r.Context())
 	if err != nil {
-		return false, fmt.Errorf("unable to list checks for PR: %w", err)
+		d.Logger.IfErr(err).Error(r.Context(), "unable to get github token")
+		return
 	}
-	logger.Debug(ctx, "got checks", zap.Any("checks", checks))
-	for _, checkRun := range checks.CheckRuns {
-		if checkRun.GetStatus() != "completed" {
-			logger.Debug(ctx, "status not completed")
-			return false, nil
+	r.SetBasicAuth(ghAppUserName, tok)
+}
+
+var _ http.AuthMethod = &dynamicAuthMethod{}
+
+type GraphQLPRQueryNode struct {
+	Id         githubv4.ID
+	Number     githubv4.Int
+	Locked     githubv4.Boolean
+	Merged     githubv4.Boolean
+	IsDraft    githubv4.Boolean
+	Mergeable  githubv4.MergeableState
+	State      githubv4.PullRequestState
+	Body       githubv4.String
+	UpdatedAt  githubv4.DateTime
+	Repository struct {
+		Owner struct {
+			Login githubv4.String
 		}
-		allowedStates := []string{"", "neutral", "success", "skipped", "stale"}
-		okState := false
-		for _, s := range allowedStates {
-			if checkRun.GetConclusion() == s {
-				okState = true
+		Name githubv4.String
+	}
+	Author struct {
+		Login githubv4.String
+		Bot   struct {
+			Id githubv4.String
+		} `graphql:"... on Bot"`
+		User struct {
+			Id githubv4.String
+		} `graphql:"... on User"`
+	}
+	Reviews struct {
+		Nodes []struct {
+			State  githubv4.String
+			Commit struct {
+				Oid githubv4.GitObjectID
+			}
+			AuthorCanPushToRepository githubv4.Boolean
+			Author                    struct {
+				Login githubv4.String
+				Bot   struct {
+					Id githubv4.ID
+				} `graphql:"... on Bot"`
+				User struct {
+					Id githubv4.ID
+				} `graphql:"... on User"`
 			}
 		}
-		if !okState {
-			logger.Info(ctx, "check not in ok state", zap.Any("checkrun", checkRun))
-			return false, nil
+	} `graphql:"reviews(first: 100, after: $reviews_after, states: [APPROVED], author: $pr_author)"`
+	HeadRef struct {
+		Target struct {
+			Oid    githubv4.GitObjectID
+			Commit struct {
+				StatusCheckRollup struct {
+					State githubv4.StatusState
+				}
+			} `graphql:"... on Commit"`
 		}
 	}
-	return true, nil
+}
+
+type GraphQLPRQuery struct {
+	Repository struct {
+		PullRequests struct {
+			Nodes []GraphQLPRQueryNode
+		} `graphql:"pullRequests(first: 100, after: $pr_after, states: $states)"`
+	} `graphql:"repository(owner: $owner, name: $name)"`
+}
+
+type MergePullRequestOutput struct {
+	MergePullRequest struct {
+		PullRequest struct {
+			Id githubv4.ID
+		}
+	} `graphql:"mergePullRequest(input: $input)"`
+}
+
+type UserInfo struct {
+	Login githubv4.String
+	Id    githubv4.ID
+}
+
+func (g *GithubAPI) Self(ctx context.Context) (*UserInfo, error) {
+	var q struct {
+		Viewer struct {
+			UserInfo
+		}
+	}
+	if err := g.clientV4.Query(ctx, &q, nil); err != nil {
+		return nil, fmt.Errorf("unable to run graphql query: %w", err)
+	}
+	return &q.Viewer.UserInfo, nil
+}
+
+type AcceptPullRequestOutput struct {
+	AddPullRequestReview struct {
+		PullRequestReview struct {
+			Id githubv4.ID
+		}
+	} `graphql:"addPullRequestReview(input: $input)"`
+}
+
+func (g *GithubAPI) AcceptPullRequest(ctx context.Context, in githubv4.AddPullRequestReviewInput) (*AcceptPullRequestOutput, error) {
+	var ret AcceptPullRequestOutput
+	if err := g.clientV4.Mutate(ctx, &ret, in, nil); err != nil {
+		return nil, fmt.Errorf("unable to graphql accept PR: %w", err)
+	}
+	return &ret, nil
+}
+
+func (g *GithubAPI) MergePullRequest(ctx context.Context, in githubv4.MergePullRequestInput) (*MergePullRequestOutput, error) {
+	var mergeMutation MergePullRequestOutput
+	err := g.clientV4.Mutate(ctx, &mergeMutation, in, nil)
+	if err != nil {
+		return nil, fmt.Errorf("unable to do create a merge: %w", err)
+	}
+	return &mergeMutation, nil
+}
+
+func (g *GithubAPI) EveryPullRequest(ctx context.Context, repoCfg autobotcfg.RepoConfig) (*GraphQLPRQuery, error) {
+	owner, repo, err := repoCfg.GithubOwnerRepo()
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse repository: %w", err)
+	}
+	var ret GraphQLPRQuery
+	err = g.clientV4.Query(ctx, &ret, map[string]interface{}{
+		"owner":         githubv4.String(owner),
+		"name":          githubv4.String(repo),
+		"pr_after":      (*githubv4.String)(nil),
+		"reviews_after": (*githubv4.String)(nil),
+		"pr_author":     (*githubv4.String)(nil),
+		"states":        []githubv4.PullRequestState{githubv4.PullRequestStateOpen},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("unable to query graphql: %w", err)
+	}
+	return &ret, nil
 }
