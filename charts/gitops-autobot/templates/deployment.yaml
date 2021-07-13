@@ -109,6 +109,6 @@ spec:
             secretName: {{ .Values.autobot.secretMount }}
             defaultMode: 256
         {{- end }}
-  {{- if .Values.extraVolumes }}
-  {{ toYaml .Values.extraVolumes | indent 6 }}
-  {{- end }}
+{{- if .Values.extraVolumes }}
+{{ toYaml .Values.extraVolumes | indent 8 }}
+{{- end }}
