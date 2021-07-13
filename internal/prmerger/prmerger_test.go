@@ -3,6 +3,11 @@ package prmerger
 import (
 	"bytes"
 	"context"
+	"io"
+	http2 "net/http"
+	"os"
+	"testing"
+
 	"github.com/cresta/gitops-autobot/internal/autobotcfg"
 	"github.com/cresta/gitops-autobot/internal/cache"
 	"github.com/cresta/gitops-autobot/internal/ghapp"
@@ -11,10 +16,6 @@ import (
 	"github.com/cresta/zapctx/testhelp/testhelp"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
-	"io"
-	http2 "net/http"
-	"os"
-	"testing"
 )
 
 func TestPRMerger_Execute(t *testing.T) {

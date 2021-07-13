@@ -3,12 +3,13 @@ package cachedgithub
 import (
 	"context"
 	"fmt"
+	"sync"
+	"time"
+
 	"github.com/cresta/gitops-autobot/internal/cache"
 	"github.com/cresta/gitops-autobot/internal/ghapp"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/shurcooL/githubv4"
-	"sync"
-	"time"
 )
 
 type CachedGithub struct {

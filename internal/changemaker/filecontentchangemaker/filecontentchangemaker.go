@@ -2,13 +2,14 @@ package filecontentchangemaker
 
 import (
 	"fmt"
+	"io"
+
 	"github.com/cresta/gitops-autobot/internal/autobotcfg"
 	"github.com/cresta/gitops-autobot/internal/changemaker"
 	"github.com/cresta/zapctx"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
-	"io"
 )
 
 type FileContentWorkingTreeChanger struct {
@@ -137,7 +138,7 @@ type SingleChange struct {
 }
 
 func splitChange(ec []ExpectedChange) []GroupedChange {
-	var ret []GroupedChange
+	ret := make([]GroupedChange, 0, len(ec))
 	changesByHash := make(map[string]*GroupedChange)
 	for _, c := range ec {
 		thisChange := SingleChange{

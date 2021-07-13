@@ -3,11 +3,12 @@ package timechangemaker
 import (
 	"bytes"
 	"fmt"
+	"strings"
+	"time"
+
 	"github.com/cresta/gitops-autobot/internal/autobotcfg"
 	"github.com/cresta/gitops-autobot/internal/changemaker"
 	"github.com/cresta/gitops-autobot/internal/changemaker/filecontentchangemaker"
-	"strings"
-	"time"
 )
 
 type TimeWorkingTreeChanger struct {

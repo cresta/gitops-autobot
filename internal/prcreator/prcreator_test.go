@@ -3,6 +3,12 @@ package prcreator
 import (
 	"bytes"
 	"context"
+	"io"
+	"io/ioutil"
+	http2 "net/http"
+	"os"
+	"testing"
+
 	"github.com/cresta/gitops-autobot/internal/autobotcfg"
 	"github.com/cresta/gitops-autobot/internal/cache"
 	"github.com/cresta/gitops-autobot/internal/changemaker"
@@ -14,11 +20,6 @@ import (
 	"github.com/cresta/zapctx/testhelp/testhelp"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
-	"io"
-	"io/ioutil"
-	http2 "net/http"
-	"os"
-	"testing"
 )
 
 func TestPrCreator_Execute(t *testing.T) {
@@ -63,7 +64,7 @@ func TestPrCreator_Execute(t *testing.T) {
 	cfg, err = ghapp.PopulateRepoDefaultBranches(ctx, cfg, client)
 	require.NoError(t, err)
 
-	var allCheckouts []*checkout.Checkout
+	allCheckouts := make([]*checkout.Checkout, 0, len(cfg.Repos))
 	for _, repo := range cfg.Repos {
 		co, err := checkout.NewCheckout(ctx, logger, repo, cfg.CloneDataDir, client.GoGetAuthMethod())
 		require.NoError(t, err)

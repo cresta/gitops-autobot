@@ -3,6 +3,8 @@ package githubdirect
 import (
 	"context"
 	"fmt"
+	http2 "net/http"
+
 	"github.com/bradleyfalzon/ghinstallation"
 	"github.com/cresta/gitops-autobot/internal/autobotcfg"
 	"github.com/cresta/gitops-autobot/internal/ghapp"
@@ -10,7 +12,6 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/google/go-github/v29/github"
 	"github.com/shurcooL/githubv4"
-	http2 "net/http"
 )
 
 func NewFromConfig(ctx context.Context, cfg autobotcfg.GithubAppConfig, rt http2.RoundTripper, logger *zapctx.Logger) (*GithubDirect, error) {

@@ -5,6 +5,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"io/ioutil"
+	"os"
+	"strings"
+
 	"github.com/cresta/gitops-autobot/internal/autobotcfg"
 	"github.com/cresta/gitops-autobot/internal/ghapp"
 	"github.com/cresta/zapctx"
@@ -16,10 +21,6 @@ import (
 	"github.com/google/go-github/v29/github"
 	"github.com/shurcooL/githubv4"
 	"go.uber.org/zap"
-	"io"
-	"io/ioutil"
-	"os"
-	"strings"
 )
 
 type Checkout struct {
@@ -236,7 +237,7 @@ func (c *Checkout) PushAllNewBranches(ctx context.Context, client ghapp.GithubAP
 		prObj.Base = &c.RepoConfig.Branch
 		prObj.Head = github.String(b.Reverse().Src())
 		if _, err := client.CreatePullRequest(ctx, c.RepoConfig.Owner, c.RepoConfig.Name, githubv4.CreatePullRequestInput{
-			RepositoryID: repoInfo.Repository.Id,
+			RepositoryID: repoInfo.Repository.ID,
 			BaseRefName:  "main",
 			HeadRefName:  githubv4.String(b.Src()),
 			Title:        githubv4.String(*prObj.Title),

@@ -3,11 +3,12 @@ package autobotcfg
 import (
 	"bytes"
 	"fmt"
-	"gopkg.in/yaml.v2"
 	"io"
 	"os"
 	"regexp"
 	"time"
+
+	"gopkg.in/yaml.v2"
 )
 
 type AutobotPerRepoConfig struct {

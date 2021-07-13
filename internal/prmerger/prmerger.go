@@ -3,12 +3,13 @@ package prmerger
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	"github.com/cresta/gitops-autobot/internal/autobotcfg"
 	"github.com/cresta/gitops-autobot/internal/ghapp"
 	"github.com/cresta/zapctx"
 	"github.com/shurcooL/githubv4"
 	"go.uber.org/zap"
-	"strings"
 )
 
 type PRMerger struct {
@@ -80,7 +81,7 @@ func (p *PRMerger) processPr(ctx context.Context, pr ghapp.GraphQLPRQueryNode) e
 
 	method := githubv4.PullRequestMergeMethodSquash
 	if _, err := p.Client.MergePullRequest(ctx, string(pr.Repository.Owner.Login), string(pr.Repository.Name), githubv4.MergePullRequestInput{
-		PullRequestID:   pr.Id,
+		PullRequestID:   pr.ID,
 		ExpectedHeadOid: &pr.HeadRef.Target.Oid,
 		MergeMethod:     &method,
 	}); err != nil {

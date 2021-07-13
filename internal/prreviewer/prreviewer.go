@@ -3,13 +3,14 @@ package prreviewer
 import (
 	"context"
 	"fmt"
+	"strings"
+	"time"
+
 	"github.com/cresta/gitops-autobot/internal/autobotcfg"
 	"github.com/cresta/gitops-autobot/internal/ghapp"
 	"github.com/cresta/zapctx"
 	"github.com/shurcooL/githubv4"
 	"go.uber.org/zap"
-	"strings"
-	"time"
 )
 
 type PrReviewer struct {
@@ -59,7 +60,7 @@ func (p *PrReviewer) processPr(ctx context.Context, pr ghapp.GraphQLPRQueryNode,
 		logger.Debug(ctx, "pr not asking for review")
 		return nil
 	}
-	if p.PRMaker.Id != pr.Author.Bot.Id && p.PRMaker.Id != pr.Author.User.Id {
+	if p.PRMaker.ID != pr.Author.Bot.ID && p.PRMaker.ID != pr.Author.User.ID {
 		if !cfg.AllowUsersToTriggerAccept {
 			if p.PRMaker == nil {
 				logger.Debug(ctx, "not allowing users to accept reviews")
@@ -92,7 +93,7 @@ func (p *PrReviewer) processPr(ctx context.Context, pr ghapp.GraphQLPRQueryNode,
 	event := githubv4.PullRequestReviewEventApprove
 	body := githubv4.String("auto accepted by gitops reviewbot")
 	if _, err := p.Client.AcceptPullRequest(ctx, string(pr.Repository.Owner.Login), string(pr.Repository.Name), githubv4.AddPullRequestReviewInput{
-		PullRequestID: pr.Id,
+		PullRequestID: pr.ID,
 		CommitOID:     &pr.HeadRef.Target.Oid,
 		Body:          &body,
 		Event:         &event,

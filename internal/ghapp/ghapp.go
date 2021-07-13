@@ -3,10 +3,11 @@ package ghapp
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	"github.com/cresta/gitops-autobot/internal/autobotcfg"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/shurcooL/githubv4"
-	"strings"
 )
 
 type GithubAPI interface {
@@ -22,7 +23,7 @@ type GithubAPI interface {
 
 type RepositoryInfo struct {
 	Repository struct {
-		Id               githubv4.ID
+		ID               githubv4.ID
 		DefaultBranchRef struct {
 			Name githubv4.String
 			ID   githubv4.ID
@@ -33,12 +34,14 @@ type RepositoryInfo struct {
 type CreatePullRequest struct {
 	CreatePullRequest struct {
 		// Note: This is unused, but the library requires at least something to be read for the mutation to happen
-		ClientMutationId githubv4.ID
+		ClientMutationID githubv4.ID
 	} `graphql:"createPullRequest(input: $input)"`
 }
 
+//nolint:maligned
+// GraphQLPRQueryNode is our catch-all pull request data
 type GraphQLPRQueryNode struct {
-	Id                githubv4.ID
+	ID                githubv4.ID
 	Number            githubv4.Int
 	Locked            githubv4.Boolean
 	Merged            githubv4.Boolean
@@ -58,10 +61,10 @@ type GraphQLPRQueryNode struct {
 	Author struct {
 		Login githubv4.String
 		Bot   struct {
-			Id githubv4.ID
+			ID githubv4.ID
 		} `graphql:"... on Bot"`
 		User struct {
-			Id githubv4.ID
+			ID githubv4.ID
 		} `graphql:"... on User"`
 	}
 	ViewerLatestReview struct {
@@ -94,20 +97,20 @@ type GraphQLPRQuery struct {
 type MergePullRequestOutput struct {
 	MergePullRequest struct {
 		PullRequest struct {
-			Id githubv4.ID
+			ID githubv4.ID
 		}
 	} `graphql:"mergePullRequest(input: $input)"`
 }
 
 type UserInfo struct {
 	Login githubv4.String
-	Id    githubv4.ID
+	ID    githubv4.ID
 }
 
 type AcceptPullRequestOutput struct {
 	AddPullRequestReview struct {
 		PullRequestReview struct {
-			Id githubv4.ID
+			ID githubv4.ID
 		}
 	} `graphql:"addPullRequestReview(input: $input)"`
 }

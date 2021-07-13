@@ -3,12 +3,13 @@ package changemaker
 import (
 	"bytes"
 	"fmt"
+	"time"
+
 	"github.com/cresta/gitops-autobot/internal/autobotcfg"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"gopkg.in/yaml.v2"
-	"time"
 )
 
 type gitCommitter struct {
@@ -74,10 +75,10 @@ type Factory struct {
 	Factories []WorkingTreeChangerFactory
 }
 
-func (f *Factory) Load(ChangeMakers []autobotcfg.ChangeMakerConfig, repoCfg autobotcfg.AutobotPerRepoConfig) ([]WorkingTreeChanger, error) {
+func (f *Factory) Load(changeMakers []autobotcfg.ChangeMakerConfig, repoCfg autobotcfg.AutobotPerRepoConfig) ([]WorkingTreeChanger, error) {
 	var ret []WorkingTreeChanger
 	for _, rcm := range repoCfg.ChangeMakers {
-		for _, cm := range ChangeMakers {
+		for _, cm := range changeMakers {
 			if cm.Name != rcm.Name {
 				continue
 			}

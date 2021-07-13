@@ -2,10 +2,11 @@ package ghapp
 
 import (
 	"fmt"
+	http2 "net/http"
+
 	"github.com/bradleyfalzon/ghinstallation"
 	"github.com/cresta/zapctx"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
-	http2 "net/http"
 )
 
 type DynamicAuthMethod struct {

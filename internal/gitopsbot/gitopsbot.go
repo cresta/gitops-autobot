@@ -3,13 +3,14 @@ package gitopsbot
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/cresta/gitops-autobot/internal/checkout"
 	"github.com/cresta/gitops-autobot/internal/prcreator"
 	"github.com/cresta/gitops-autobot/internal/prmerger"
 	"github.com/cresta/gitops-autobot/internal/prreviewer"
 	"github.com/cresta/zapctx"
 	"go.uber.org/zap"
-	"time"
 )
 
 type GitopsBot struct {

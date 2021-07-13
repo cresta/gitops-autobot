@@ -4,6 +4,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
+	"net"
+	"net/http"
+	"os"
+	"time"
+
 	"github.com/cresta/gitops-autobot/internal/autobotcfg"
 	"github.com/cresta/gitops-autobot/internal/cache"
 	"github.com/cresta/gitops-autobot/internal/changemaker"
@@ -16,11 +22,6 @@ import (
 	"github.com/cresta/gitops-autobot/internal/prcreator"
 	"github.com/cresta/gitops-autobot/internal/prmerger"
 	"github.com/cresta/gitops-autobot/internal/prreviewer"
-	"io"
-	"net"
-	"net/http"
-	"os"
-	"time"
 
 	"github.com/cresta/gotracing"
 	"github.com/cresta/gotracing/datadog"
@@ -219,7 +220,7 @@ func (m *Service) injection(ctx context.Context, tracer gotracing.Tracing) error
 	if err != nil {
 		return fmt.Errorf("unable to populate default branches: %w", err)
 	}
-	var allCheckouts []*checkout.Checkout
+	allCheckouts := make([]*checkout.Checkout, 0, len(cfg.Repos))
 	for _, repo := range cfg.Repos {
 		co, err := checkout.NewCheckout(ctx, m.log, repo, cfg.CloneDataDir, cachedPRCreatorClient.GoGetAuthMethod())
 		if err != nil {
