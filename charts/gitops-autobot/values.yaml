@@ -31,9 +31,12 @@ podSecurityContext: {}
 autobot: {}
   # logLevel: info
   # tracer: datadog
-  # configFile: gitops-autobot.yaml
+  # configFile: gitops-autobot.yaml (Leave unset if using autobotServiceConfig)
   # cronInterval: 90s
   # envSecrets: [ ... ]
+  # secretMount: name-of-secrets-file
+
+autobotServiceConfig: {}
 
 securityContext: {}
   # capabilities:

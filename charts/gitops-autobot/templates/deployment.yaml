@@ -45,6 +45,10 @@ spec:
             - name: GITOPS_CONFIG_FILE
               value: {{ .Values.autobot.configFile | quote }}
             {{- end }}
+            {{- if .Values.autobotServiceConfig }}
+            - name: GITOPS_CONFIG_FILE
+              value: /etc/gitops-autobot/gitops-autobot.yaml
+            {{- end }}
             {{- if .Values.autobot.cronInterval }}
             - name: CRON_INTERVAL
               value: {{ .Values.autobot.cronInterval | quote }}
@@ -67,8 +71,18 @@ spec:
               port: http
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
-{{- if .Values.extraVolumeMounts }}
           volumeMounts:
+            {{- if .Values.autobotServiceConfig }}
+            - mountPath: /etc/gitops-autobot
+              name: autobotcfg
+              readOnly: true
+            {{- end }}
+            {{- if .Values.autobot.secretMount }}
+            - mountPath: /etc/gitops-autobot-secrets
+              name: autobotcfg-secret-mount
+              readOnly: true
+            {{- end }}
+{{- if .Values.extraVolumeMounts }}
 {{ toYaml .Values.extraVolumeMounts | indent 12 }}
 {{- end }}
       {{- with .Values.nodeSelector }}
@@ -83,7 +97,18 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-{{- if .Values.extraVolumes }}
       volumes:
-{{ toYaml .Values.extraVolumes | indent 6 }}
-{{- end }}
+        {{- if .Values.autobotServiceConfig }}
+        - name: autobotcfg
+          configMap:
+            name: {{ include "gitops-autobot.fullname" . }}-cfg
+        {{- end }}
+        {{- if .Values.autobot.secretMount }}
+        - name: autobotcfg-secret-mount
+          secret:
+            secretName: {{ .Values.autobot.secretMount }}
+            defaultMode: 256
+        {{- end }}
+  {{- if .Values.extraVolumes }}
+  {{ toYaml .Values.extraVolumes | indent 6 }}
+  {{- end }}

@@ -1,0 +1,11 @@
+{{- if .Values.autobotServiceConfig }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "gitops-autobot.fullname" . }}-cfg
+  labels:
+  {{- include "gitops-autobot.labels" . | nindent 4 }}
+data:
+  gitops-autobot.yaml: |
+{{- toYaml .Values.autobotServiceConfig | nindent 4 }}
+{{- end }}
