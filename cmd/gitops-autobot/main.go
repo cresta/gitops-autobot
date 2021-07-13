@@ -1,11 +1,27 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"os"
+	"time"
+
+	"github.com/cresta/gitops-autobot/internal/autobotcfg"
+	"github.com/cresta/gitops-autobot/internal/cache"
+	"github.com/cresta/gitops-autobot/internal/changemaker"
+	"github.com/cresta/gitops-autobot/internal/changemaker/filecontentchangemaker/timechangemaker"
+	"github.com/cresta/gitops-autobot/internal/checkout"
+	"github.com/cresta/gitops-autobot/internal/ghapp"
+	"github.com/cresta/gitops-autobot/internal/ghapp/cachedgithub"
+	"github.com/cresta/gitops-autobot/internal/ghapp/githubdirect"
+	"github.com/cresta/gitops-autobot/internal/gitopsbot"
+	"github.com/cresta/gitops-autobot/internal/prcreator"
+	"github.com/cresta/gitops-autobot/internal/prmerger"
+	"github.com/cresta/gitops-autobot/internal/prreviewer"
 
 	"github.com/cresta/gotracing"
 	"github.com/cresta/gotracing/datadog"
@@ -22,6 +38,10 @@ type config struct {
 	DebugListenAddr string
 	Tracer          string
 	LogLevel        string
+	GithubRepos     string
+	AppPrivateKey   string
+	ConfigFile      string
+	CronInterval    time.Duration
 }
 
 func (c config) WithDefaults() config {
@@ -34,6 +54,12 @@ func (c config) WithDefaults() config {
 	if c.LogLevel == "" {
 		c.LogLevel = "INFO"
 	}
+	if c.ConfigFile == "" {
+		c.ConfigFile = "gitops-autobot.yaml"
+	}
+	if c.CronInterval == 0 {
+		c.CronInterval = time.Minute + time.Second*30
+	}
 	return c
 }
 
@@ -44,9 +70,22 @@ func getConfig() config {
 		// Defaults to ":6060"
 		DebugListenAddr: os.Getenv("DEBUG_ADDR"),
 		// Allows you to use a dynamic tracer
-		Tracer:   os.Getenv("TRACER"),
+		Tracer: os.Getenv("TRACER"),
+		// Level to log at
 		LogLevel: os.Getenv("LOG_LEVEL"),
+		// ConfigFile is the location of the gitops repo config file
+		ConfigFile: os.Getenv("GITOPS_CONFIG_FILE"),
+		// CronInterval is how frequently we make new pull requests
+		CronInterval: fromDuration("CRON_INTERVAL"),
 	}.WithDefaults()
+}
+
+func fromDuration(envKey string) time.Duration {
+	ret, err := time.ParseDuration(os.Getenv(envKey))
+	if err != nil {
+		panic("invalid duration at " + envKey + ": " + err.Error())
+	}
+	return ret
 }
 
 func main() {
@@ -54,12 +93,13 @@ func main() {
 }
 
 type Service struct {
-	osExit   func(int)
-	config   config
-	log      *zapctx.Logger
-	onListen func(net.Listener)
-	server   *http.Server
-	tracers  *gotracing.Registry
+	osExit    func(int)
+	config    config
+	log       *zapctx.Logger
+	onListen  func(net.Listener)
+	server    *http.Server
+	tracers   *gotracing.Registry
+	gitopsBot *gitopsbot.GitopsBot
 }
 
 var instance = Service{
@@ -112,7 +152,7 @@ func (m *Service) Main() {
 
 	ctx := context.Background()
 	m.log = m.log.DynamicFields(rootTracer.DynamicFields()...)
-	if err := m.injection(ctx); err != nil {
+	if err := m.injection(ctx, rootTracer); err != nil {
 		m.log.IfErr(err).Panic(ctx, "unable to inject starting variables")
 		m.osExit(1)
 		return
@@ -125,6 +165,8 @@ func (m *Service) Main() {
 		m.osExit(1)
 		return
 	}
+	m.gitopsBot.Setup()
+	go m.gitopsBot.Cron(ctx)
 	serveErr := httpsimple.BasicServerRun(m.log, m.server, m.onListen, m.config.ListenAddr)
 
 	shutdownCallback()
@@ -133,7 +175,90 @@ func (m *Service) Main() {
 	}
 }
 
-func (m *Service) injection(ctx context.Context) error {
+func (m *Service) injection(ctx context.Context, tracer gotracing.Tracing) error {
+	f, err := os.Open(m.config.GithubRepos)
+	if err != nil {
+		return fmt.Errorf("unable to open file %s: %w", m.config.GithubRepos, err)
+	}
+	defer func() {
+		m.log.IfErr(f.Close()).Error(ctx, "unable to close opened config file")
+	}()
+	var buf bytes.Buffer
+	if _, err = io.Copy(&buf, f); err != nil {
+		return fmt.Errorf("unable to copy from config file: %w", err)
+	}
+	cfg, err := autobotcfg.Load(&buf)
+	if err != nil {
+		return fmt.Errorf("unable to load config file: %w", err)
+	}
+	committer, err := changemaker.CommitterFromConfig(cfg.CommitterConfig)
+	if err != nil {
+		return fmt.Errorf("unable to load committer from config: %w", err)
+	}
+	memoryCache := &cache.InMemoryCache{}
+	directPRCreatorClient, err := githubdirect.NewFromConfig(ctx, cfg.PRCreator, tracer.WrapRoundTrip(http.DefaultTransport), m.log)
+	if err != nil {
+		return fmt.Errorf("unable to make direct github client: %w", err)
+	}
+	cachedPRCreatorClient := &cachedgithub.CachedGithub{
+		Into:  directPRCreatorClient,
+		Cache: memoryCache,
+	}
+	prMaker, err := cachedPRCreatorClient.Self(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to find self for pr creator: %w", err)
+	}
+	directPRReviewerClient, err := githubdirect.NewFromConfig(ctx, *cfg.PRReviewer, tracer.WrapRoundTrip(http.DefaultTransport), m.log)
+	if err != nil {
+		return fmt.Errorf("unable to make direct github client: %w", err)
+	}
+	cachedPRReviewerClient := &cachedgithub.CachedGithub{
+		Into:  directPRReviewerClient,
+		Cache: memoryCache,
+	}
+	cfg, err = ghapp.PopulateRepoDefaultBranches(ctx, cfg, cachedPRCreatorClient)
+	if err != nil {
+		return fmt.Errorf("unable to populate default branches: %w", err)
+	}
+	allCheckouts := make([]*checkout.Checkout, 0, len(cfg.Repos))
+	for _, repo := range cfg.Repos {
+		co, err := checkout.NewCheckout(ctx, m.log, repo, cfg.CloneDataDir, cachedPRCreatorClient.GoGetAuthMethod())
+		if err != nil {
+			return fmt.Errorf("unable to setup checkout: %w", err)
+		}
+		allCheckouts = append(allCheckouts, co)
+	}
+	factory := changemaker.Factory{
+		Factories: []changemaker.WorkingTreeChangerFactory{
+			timechangemaker.Factory,
+		},
+	}
+	prCreator := &prcreator.PrCreator{
+		F:             &factory,
+		AutobotConfig: cfg,
+		Logger:        m.log,
+		GitCommitter:  committer,
+		Client:        cachedPRCreatorClient,
+	}
+	prMerger := &prmerger.PRMerger{
+		AutobotConfig: cfg,
+		Client:        cachedPRReviewerClient,
+		Logger:        m.log,
+	}
+	prReviewer := &prreviewer.PrReviewer{
+		AutobotConfig: cfg,
+		Logger:        m.log,
+		Client:        cachedPRReviewerClient,
+		PRMaker:       prMaker,
+	}
+	m.gitopsBot = &gitopsbot.GitopsBot{
+		PRCreator:    prCreator,
+		PrReviewer:   prReviewer,
+		PRMerger:     prMerger,
+		Checkouts:    allCheckouts,
+		Logger:       m.log.With(zap.String("class", "gitopsbot")),
+		CronInterval: m.config.CronInterval,
+	}
 	return nil
 }
 

@@ -28,14 +28,11 @@ podAnnotations: {}
 podSecurityContext: {}
   # fsGroup: 2000
 
-pd: {}
-  # envSecrets: secret-path
+autobot: {}
   # logLevel: info
-  # lookbackDuration: 168h
-  # availabilityWindow: 24h
-  # refreshInterval: 1m
-  # token: y_Izyx
   # tracer: datadog
+  # configFile: gitops-autobot.yaml
+  # cronInterval: 90s
 
 securityContext: {}
   # capabilities:
