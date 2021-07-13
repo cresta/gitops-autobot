@@ -2,3 +2,4 @@
 /*.pem
 /*.ppk
 test-repo-config.yaml
+/charts/*/*.tgz
