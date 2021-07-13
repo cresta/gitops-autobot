@@ -81,7 +81,11 @@ func getConfig() config {
 }
 
 func fromDuration(envKey string) time.Duration {
-	ret, err := time.ParseDuration(os.Getenv(envKey))
+	envVal := os.Getenv(envKey)
+	if envVal == "" {
+		return 0
+	}
+	ret, err := time.ParseDuration(envVal)
 	if err != nil {
 		panic("invalid duration at " + envKey + ": " + err.Error())
 	}
