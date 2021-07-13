@@ -62,7 +62,7 @@ func (f *FileContentWorkingTreeChanger) ChangeWorkingTree(w *git.Worktree, baseC
 	}
 	var allChanges []ExpectedChange
 	err = files.ForEach(func(file *object.File) error {
-		if !f.PerRepo.MatcheFile(file.Name) {
+		if !f.PerRepo.MatchFile(file.Name) {
 			return nil
 		}
 		gf := gitFile{file: file}

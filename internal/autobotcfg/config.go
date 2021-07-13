@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"regexp"
-	"strings"
 	"time"
 )
 
@@ -24,12 +23,11 @@ type AutobotConfig struct {
 	ChangeMakers         []ChangeMakerConfig `yaml:"changeMakers"`
 	CloneDataDir         string              `yaml:"cloneDataDir"`
 	Repos                []RepoConfig        `yaml:"repos"`
-	DefaultRemoteBranch  string              `yaml:"defaultRemoteBranch"`
-	ComitterConfig       ComitterConfig      `yaml:"comitterConfig"`
+	CommitterConfig      CommitterConfig     `yaml:"committerConfig"`
 	DelayForAutoApproval time.Duration       `yaml:"delayForAutoApproval"`
 }
 
-type ComitterConfig struct {
+type CommitterConfig struct {
 	AuthorName  string `yaml:"authorName"`
 	AuthorEmail string `yaml:"authorEmail"`
 }
@@ -51,27 +49,21 @@ func (g *GithubAppConfig) Validate() error {
 }
 
 type RepoConfig struct {
-	Location string `yaml:"location"`
-	Branch   string `yaml:"branch"`
+	Branch string `yaml:"branch"`
+	Owner  string `yaml:"owner"`
+	Name   string `yaml:"name"`
 }
 
-func (r *RepoConfig) GithubOwnerRepo() (string, string, error) {
-	loc := r.Location
-	//https://github.com/cep21/circuit.git
-	loc = strings.TrimPrefix(loc, "https://github.com/")
-	loc = strings.TrimSuffix(loc, ".git")
-	parts := strings.Split(loc, "/")
-	if len(parts) != 2 {
-		return "", "", fmt.Errorf("unable to parse remote %s", r.Location)
-	}
-	return parts[0], parts[1], nil
+func (r RepoConfig) CloneURL() string {
+	return fmt.Sprintf("https://github.com/%s/%s.git", r.Owner, r.Name)
 }
 
 type PerRepoChangeMakerConfig struct {
-	Name           string   `yaml:"name"`
-	FileMatchRegex []string `yaml:"fileMatchRegex"`
-	AutoApprove    bool     `yaml:"autoApprove"`
-	AutoMerge      bool     `yaml:"autoMerge"`
+	Name           string      `yaml:"name"`
+	FileMatchRegex []string    `yaml:"fileMatchRegex"`
+	AutoApprove    bool        `yaml:"autoApprove"`
+	AutoMerge      bool        `yaml:"autoMerge"`
+	Data           interface{} `yaml:"data"`
 	regexp         []*regexp.Regexp
 }
 
@@ -83,7 +75,7 @@ func (c *PerRepoChangeMakerConfig) Regex() []*regexp.Regexp {
 	return c.regexp
 }
 
-func (c *PerRepoChangeMakerConfig) MatcheFile(name string) bool {
+func (c *PerRepoChangeMakerConfig) MatchFile(name string) bool {
 	if len(c.regexp) == 0 {
 		return true
 	}
@@ -106,19 +98,11 @@ func Load(cfg io.WriterTo) (*AutobotConfig, error) {
 	if err := d.Decode(&ret); err != nil {
 		return nil, fmt.Errorf("unable to decode config file: %w", err)
 	}
-	if ret.DefaultRemoteBranch == "" {
-		ret.DefaultRemoteBranch = "master"
-	}
 	if ret.DelayForAutoApproval == 0 {
 		ret.DelayForAutoApproval = time.Minute
 	}
 	if ret.CloneDataDir == "" {
 		ret.CloneDataDir = os.TempDir()
-	}
-	for idx := range ret.Repos {
-		if ret.Repos[idx].Branch == "" {
-			ret.Repos[idx].Branch = ret.DefaultRemoteBranch
-		}
 	}
 	if err := ret.PRCreator.Validate(); err != nil {
 		return nil, fmt.Errorf("unable to validate pr creator: %w", err)

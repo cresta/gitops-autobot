@@ -15,7 +15,7 @@ type PrCreator struct {
 	AutobotConfig *autobotcfg.AutobotConfig
 	Logger        *zapctx.Logger
 	GitCommitter  changemaker.GitCommitter
-	Client        *ghapp.GithubAPI
+	Client        ghapp.GithubAPI
 }
 
 func (p *PrCreator) Execute(ctx context.Context, checkout *checkout.Checkout) error {

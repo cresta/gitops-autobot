@@ -5,6 +5,7 @@ import (
 	"context"
 	"github.com/cresta/gitops-autobot/internal/autobotcfg"
 	"github.com/cresta/gitops-autobot/internal/ghapp"
+	"github.com/cresta/gitops-autobot/internal/ghapp/githubdirect"
 	"github.com/cresta/zapctx/testhelp/testhelp"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -34,7 +35,9 @@ func TestPRMerger_Execute(t *testing.T) {
 		t.Log("no reviewer config set.  Skipping test")
 	}
 
-	client, err := ghapp.NewFromConfig(ctx, *cfg.PRReviewer, http2.DefaultTransport, logger)
+	client, err := githubdirect.NewFromConfig(ctx, *cfg.PRReviewer, http2.DefaultTransport, logger)
+	require.NoError(t, err)
+	cfg, err = ghapp.PopulateRepoDefaultBranches(ctx, cfg, client)
 	require.NoError(t, err)
 
 	pr := PRMerger{

@@ -46,7 +46,7 @@ func getConfig() config {
 		// Defaults to ":6060"
 		DebugListenAddr: os.Getenv("DEBUG_ADDR"),
 		// Allows you to use a dynamic tracer
-		Tracer:   os.Getenv("TRACER"),
+		Tracer: os.Getenv("TRACER"),
 		// Level to log at
 		LogLevel: os.Getenv("LOG_LEVEL"),
 		// Token for repo cloning
@@ -140,7 +140,7 @@ func (m *Service) Main() {
 	}
 }
 
-func (m *Service) injection(ctx context.Context) error {
+func (m *Service) injection(_ context.Context) error {
 	return nil
 }
 

@@ -1,22 +1,21 @@
 package changemaker
 
 import (
+	"bytes"
 	"fmt"
 	"github.com/cresta/gitops-autobot/internal/autobotcfg"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
+	"gopkg.in/yaml.v2"
 	"time"
 )
-
-type Commiter interface {
-}
 
 type gitCommitter struct {
 	DefaultCommitOptions *git.CommitOptions
 }
 
-func ComitterFromConfig(config autobotcfg.ComitterConfig) (GitCommitter, error) {
+func CommitterFromConfig(config autobotcfg.CommitterConfig) (GitCommitter, error) {
 	return &gitCommitter{DefaultCommitOptions: &git.CommitOptions{
 		Author: &object.Signature{
 			Name:  config.AuthorName,
@@ -110,4 +109,24 @@ func tagCommitMessage(msg string, cfg autobotcfg.PerRepoChangeMakerConfig) strin
 		msg += "\ngitops-autobot: auto-merge=true\n"
 	}
 	return msg
+}
+
+func ReEncodeYAML(pluginIn, pluginOut interface{}) error {
+	if pluginIn == nil {
+		return nil
+	}
+	var buf bytes.Buffer
+	enc := yaml.NewEncoder(&buf)
+	if err := enc.Encode(pluginIn); err != nil {
+		return fmt.Errorf("unable to re encode yaml: %w", err)
+	}
+	if err := enc.Close(); err != nil {
+		return fmt.Errorf("unable to close encoder: %w", err)
+	}
+	dec := yaml.NewDecoder(&buf)
+	dec.SetStrict(true)
+	if err := dec.Decode(pluginOut); err != nil {
+		return fmt.Errorf("unable to decode plugin output: %w", err)
+	}
+	return nil
 }

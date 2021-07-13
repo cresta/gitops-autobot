@@ -8,6 +8,7 @@ import (
 	"github.com/cresta/gitops-autobot/internal/changemaker/filecontentchangemaker/timechangemaker"
 	"github.com/cresta/gitops-autobot/internal/checkout"
 	"github.com/cresta/gitops-autobot/internal/ghapp"
+	"github.com/cresta/gitops-autobot/internal/ghapp/githubdirect"
 	"github.com/cresta/zapctx/testhelp/testhelp"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -28,7 +29,7 @@ func TestPrCreator_Execute(t *testing.T) {
 	logger := testhelp.ZapTestingLogger(t)
 	factory := changemaker.Factory{
 		Factories: []changemaker.WorkingTreeChangerFactory{
-			timechangemaker.TimeChangeMakerFactory,
+			timechangemaker.Factory,
 		},
 	}
 	testRepoCfg := "test-repo-config.yaml"
@@ -45,9 +46,11 @@ func TestPrCreator_Execute(t *testing.T) {
 	cfg.CloneDataDir = td
 	logger.Info(ctx, "loaded config", zap.Any("config", cfg))
 
-	comitter, err := changemaker.ComitterFromConfig(cfg.ComitterConfig)
+	committer, err := changemaker.CommitterFromConfig(cfg.CommitterConfig)
 	require.NoError(t, err)
-	client, err := ghapp.NewFromConfig(ctx, cfg.PRCreator, http2.DefaultTransport, logger)
+	client, err := githubdirect.NewFromConfig(ctx, cfg.PRCreator, http2.DefaultTransport, logger)
+	require.NoError(t, err)
+	cfg, err = ghapp.PopulateRepoDefaultBranches(ctx, cfg, client)
 	require.NoError(t, err)
 
 	var allCheckouts []*checkout.Checkout
@@ -63,7 +66,7 @@ func TestPrCreator_Execute(t *testing.T) {
 		F:             &factory,
 		AutobotConfig: cfg,
 		Logger:        logger,
-		GitCommitter:  comitter,
+		GitCommitter:  committer,
 		Client:        client,
 	}
 	for _, co := range allCheckouts {

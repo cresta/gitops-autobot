@@ -41,14 +41,14 @@ func NewCheckout(ctx context.Context, logger *zapctx.Logger, cfg autobotcfg.Repo
 	}
 	var progress bytes.Buffer
 	repo, err := git.PlainCloneContext(ctx, into, false, &git.CloneOptions{
-		URL:           cfg.Location,
+		URL:           cfg.CloneURL(),
 		Auth:          ch.auth,
 		Progress:      &progress,
 		SingleBranch:  true,
 		ReferenceName: plumbing.NewBranchReferenceName(cfg.Branch),
 	})
 	if err != nil {
-		return nil, fmt.Errorf("unable to do initial clone of %s: %w", cfg.Location, err)
+		return nil, fmt.Errorf("unable to do initial clone of %s: %w", cfg.CloneURL(), err)
 	}
 	ch.Repo = repo
 	return &ch, nil
@@ -174,7 +174,7 @@ func (c *Checkout) SetupForWorkingTreeChanger() (*git.Worktree, *object.Commit, 
 	return w, commitObj, nil
 }
 
-func (c *Checkout) PushAllNewBranches(ctx context.Context, client *ghapp.GithubAPI) error {
+func (c *Checkout) PushAllNewBranches(ctx context.Context, client ghapp.GithubAPI) error {
 	var branchesToPush []config.RefSpec
 	bItr, err := c.Repo.Branches()
 	if err != nil {
@@ -199,11 +199,7 @@ func (c *Checkout) PushAllNewBranches(ctx context.Context, client *ghapp.GithubA
 		return fmt.Errorf("unable to iterate branches")
 	}
 	c.Logger.Debug(ctx, "pushing new branches", zap.Any("all_branches", branchesToPush))
-	owner, repo, err := c.RepoConfig.GithubOwnerRepo()
-	if err != nil {
-		return fmt.Errorf("unable to parse repo: %w", err)
-	}
-	repoInfo, queryErr := client.RepositoryInfo(ctx, owner, repo)
+	repoInfo, queryErr := client.RepositoryInfo(ctx, c.RepoConfig.Owner, c.RepoConfig.Name)
 	if queryErr != nil {
 		return fmt.Errorf("unable to execute graphql query: %w", err)
 	}
@@ -229,7 +225,7 @@ func (c *Checkout) PushAllNewBranches(ctx context.Context, client *ghapp.GithubA
 		}
 		prObj.Base = &c.RepoConfig.Branch
 		prObj.Head = github.String(b.Reverse().Src())
-		if _, err := client.CreatePullRequest(ctx, &githubv4.CreatePullRequestInput{
+		if _, err := client.CreatePullRequest(ctx, c.RepoConfig.Owner, c.RepoConfig.Name, githubv4.CreatePullRequestInput{
 			RepositoryID: repoInfo.Repository.Id,
 			BaseRefName:  "main",
 			HeadRefName:  githubv4.String(b.Src()),

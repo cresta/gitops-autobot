@@ -13,18 +13,15 @@ import (
 )
 
 type PrReviewer struct {
-	Client          *ghapp.GithubAPI
-	Logger          *zapctx.Logger
-	AutobotConfig   *autobotcfg.AutobotConfig
-	currentReviewer *ghapp.UserInfo
+	Client        ghapp.GithubAPI
+	Logger        *zapctx.Logger
+	AutobotConfig *autobotcfg.AutobotConfig
+	PRMaker       *ghapp.UserInfo
 }
 
 func (p *PrReviewer) Execute(ctx context.Context) error {
-	if err := p.populateSelf(ctx); err != nil {
-		return fmt.Errorf("unable to populate self information: %w", err)
-	}
 	for _, r := range p.AutobotConfig.Repos {
-		repoCfg, err := p.Client.FetchMasterConfigFile(ctx, r)
+		repoCfg, err := ghapp.FetchMasterConfigFile(ctx, p.Client, r)
 		if err != nil {
 			return fmt.Errorf("uanble to fetch repo content for %s: %w", r, err)
 		}
@@ -32,7 +29,7 @@ func (p *PrReviewer) Execute(ctx context.Context) error {
 			p.Logger.Debug(ctx, "not allowed to auto review")
 			continue
 		}
-		prs, err := p.Client.EveryPullRequest(ctx, r)
+		prs, err := p.Client.EveryOpenPullRequest(ctx, r.Owner, r.Name)
 		if err != nil {
 			return fmt.Errorf("cannot list every pr: %w", err)
 		}
@@ -42,18 +39,6 @@ func (p *PrReviewer) Execute(ctx context.Context) error {
 			}
 		}
 	}
-	return nil
-}
-
-func (p *PrReviewer) populateSelf(ctx context.Context) error {
-	if p.currentReviewer != nil {
-		return nil
-	}
-	ret, err := p.Client.Self(ctx)
-	if err != nil {
-		return fmt.Errorf("unable to find self: % w", err)
-	}
-	p.currentReviewer = ret
 	return nil
 }
 
@@ -72,11 +57,17 @@ func (p *PrReviewer) processPr(ctx context.Context, pr ghapp.GraphQLPRQueryNode,
 		logger.Debug(ctx, "pr not asking for review")
 		return nil
 	}
-	if !cfg.AllowUsersToTriggerAccept {
-		//if !p.AutobotConfig.PRCreator.MatchesLogin(pr.GetUser().GetLogin()) {
-		//	logger.Debug(ctx, "not allowing users to auto accept")
-		//	return nil
-		//}
+	if p.PRMaker.Id != pr.Author.Bot.Id && p.PRMaker.Id != pr.Author.User.Id {
+		if !cfg.AllowUsersToTriggerAccept {
+			if p.PRMaker == nil {
+				logger.Debug(ctx, "not allowing users to accept reviews")
+				return nil
+			}
+		}
+		if pr.IsCrossRepository {
+			logger.Debug(ctx, "auto approve not allowed for cross repository PRs")
+			return nil
+		}
 	}
 	if pr.IsDraft {
 		logger.Debug(ctx, "ignoring draft PR")
@@ -91,22 +82,14 @@ func (p *PrReviewer) processPr(ctx context.Context, pr ghapp.GraphQLPRQueryNode,
 		return nil
 	}
 
-	for _, r := range pr.Reviews.Nodes {
-		if r.State != "APPROVED" {
-			logger.Debug(ctx, "ignore not approved review")
-		}
-		if r.Commit.Oid != pr.HeadRef.Target.Oid {
-			logger.Debug(ctx, "ignore sha mismatch")
-		}
-		if r.Author.Bot.Id == p.currentReviewer.Id || r.Author.User.Id == p.currentReviewer.Id {
-			logger.Debug(ctx, "skip because already reviewed")
-			return nil
-		}
+	if pr.ViewerLatestReview.Commit.Oid == pr.HeadRef.Target.Oid {
+		logger.Debug(ctx, "already reviewed this PR")
+		return nil
 	}
 
 	event := githubv4.PullRequestReviewEventApprove
 	body := githubv4.String("auto accepted by gitops reviewbot")
-	if _, err := p.Client.AcceptPullRequest(ctx, githubv4.AddPullRequestReviewInput{
+	if _, err := p.Client.AcceptPullRequest(ctx, string(pr.Repository.Owner.Login), string(pr.Repository.Name), githubv4.AddPullRequestReviewInput{
 		PullRequestID: pr.Id,
 		CommitOID:     &pr.HeadRef.Target.Oid,
 		Body:          &body,

@@ -12,14 +12,14 @@ import (
 )
 
 type PRMerger struct {
-	Client        *ghapp.GithubAPI
+	Client        ghapp.GithubAPI
 	Logger        *zapctx.Logger
 	AutobotConfig *autobotcfg.AutobotConfig
 }
 
 func (p *PRMerger) Execute(ctx context.Context) error {
 	for _, r := range p.AutobotConfig.Repos {
-		repoCfg, err := p.Client.FetchMasterConfigFile(ctx, r)
+		repoCfg, err := ghapp.FetchMasterConfigFile(ctx, p.Client, r)
 		if err != nil {
 			return fmt.Errorf("uanble to fetch repo content for %s: %w", r, err)
 		}
@@ -27,12 +27,12 @@ func (p *PRMerger) Execute(ctx context.Context) error {
 			p.Logger.Debug(ctx, "not allowed to auto merge")
 			continue
 		}
-		prs, err := p.Client.EveryPullRequest(ctx, r)
+		prs, err := p.Client.EveryOpenPullRequest(ctx, r.Owner, r.Name)
 		if err != nil {
 			return fmt.Errorf("cannot list every pr: %w", err)
 		}
 		for _, pr := range prs.Repository.PullRequests.Nodes {
-			if err := p.processPr(ctx, pr, repoCfg); err != nil {
+			if err := p.processPr(ctx, pr); err != nil {
 				return fmt.Errorf("unable to process pr: %w", err)
 			}
 		}
@@ -40,12 +40,12 @@ func (p *PRMerger) Execute(ctx context.Context) error {
 	return nil
 }
 
-func (p *PRMerger) processPr(ctx context.Context, pr ghapp.GraphQLPRQueryNode, cfg *autobotcfg.AutobotPerRepoConfig) error {
+func (p *PRMerger) processPr(ctx context.Context, pr ghapp.GraphQLPRQueryNode) error {
 	// Will merge a PR if all these are true
 	//   * "gitops-autobot: auto-merge=true" contained in body on line by itself (spaces trimmed)
 	//   * Not a draft
 	//   * All checks have passed
-	//   * PR is mergable
+	//   * PR is mergeable
 	logger := p.Logger.With(zap.Int32("pr", int32(pr.Number)))
 	logger.Debug(ctx, "processing pr", zap.Any("pr", pr))
 	if pr.Merged {
@@ -67,9 +67,17 @@ func (p *PRMerger) processPr(ctx context.Context, pr ghapp.GraphQLPRQueryNode, c
 		logger.Debug(ctx, "status state not success", zap.String("state", string(pr.HeadRef.Target.Commit.StatusCheckRollup.State)))
 		return nil
 	}
+	if pr.ReviewDecision == githubv4.PullRequestReviewDecisionChangesRequested {
+		logger.Debug(ctx, "unable to auto merge PR with changes requested")
+		return nil
+	}
+	if pr.ReviewDecision == githubv4.PullRequestReviewDecisionReviewRequired {
+		logger.Debug(ctx, "unable to auto merge PR with a required reviewer left")
+		return nil
+	}
 
 	method := githubv4.PullRequestMergeMethodSquash
-	if _, err := p.Client.MergePullRequest(ctx, githubv4.MergePullRequestInput{
+	if _, err := p.Client.MergePullRequest(ctx, string(pr.Repository.Owner.Login), string(pr.Repository.Name), githubv4.MergePullRequestInput{
 		PullRequestID:   pr.Id,
 		ExpectedHeadOid: &pr.HeadRef.Target.Oid,
 		MergeMethod:     &method,
