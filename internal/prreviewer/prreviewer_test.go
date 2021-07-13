@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"github.com/cresta/gitops-autobot/internal/autobotcfg"
+	"github.com/cresta/gitops-autobot/internal/cache"
 	"github.com/cresta/gitops-autobot/internal/ghapp"
+	"github.com/cresta/gitops-autobot/internal/ghapp/cachedgithub"
 	"github.com/cresta/gitops-autobot/internal/ghapp/githubdirect"
 	"github.com/cresta/zapctx/testhelp/testhelp"
 	"github.com/stretchr/testify/require"
@@ -23,6 +25,10 @@ func TestPrReviewer_Execute(t *testing.T) {
 		t.Skipf("Unable to find testing repo config file %s", testRepoCfg)
 	}
 	f, err := os.Open(testRepoCfg)
+	require.NoError(t, err)
+	defer func() {
+		require.NoError(t, f.Close())
+	}()
 	var buf bytes.Buffer
 	_, copyErr := io.Copy(&buf, f)
 	require.NoError(t, copyErr)
@@ -35,8 +41,12 @@ func TestPrReviewer_Execute(t *testing.T) {
 		t.Log("no reviewer config set.  Skipping test")
 	}
 
-	client, err := githubdirect.NewFromConfig(ctx, *cfg.PRReviewer, http2.DefaultTransport, logger)
+	directClient, err := githubdirect.NewFromConfig(ctx, *cfg.PRReviewer, http2.DefaultTransport, logger)
 	require.NoError(t, err)
+	client := &cachedgithub.CachedGithub{
+		Into:  directClient,
+		Cache: &cache.InMemoryCache{},
+	}
 	clientPrMaker, err := githubdirect.NewFromConfig(ctx, cfg.PRCreator, http2.DefaultTransport, logger)
 	require.NoError(t, err)
 	prMaker, err := clientPrMaker.Self(ctx)

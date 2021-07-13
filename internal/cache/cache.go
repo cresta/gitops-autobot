@@ -20,6 +20,7 @@ type inMemoryKey struct {
 	expireAt time.Time
 	val      []byte
 }
+
 type InMemoryCache struct {
 	cache map[string]inMemoryKey
 	mu    sync.Mutex

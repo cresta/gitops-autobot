@@ -42,6 +42,8 @@ type GithubDirect struct {
 }
 
 func (g *GithubDirect) RepositoryInfo(ctx context.Context, owner string, name string) (*ghapp.RepositoryInfo, error) {
+	g.logger.Debug(ctx, "+GithubDirect.RepositoryInfo")
+	defer g.logger.Debug(ctx, "-GithubDirect.RepositoryInfo")
 	var repoInfo ghapp.RepositoryInfo
 	if err := g.clientV4.Query(ctx, &repoInfo, map[string]interface{}{
 		"owner": githubv4.String(owner),
@@ -53,6 +55,8 @@ func (g *GithubDirect) RepositoryInfo(ctx context.Context, owner string, name st
 }
 
 func (g *GithubDirect) CreatePullRequest(ctx context.Context, _ string, _ string, in githubv4.CreatePullRequestInput) (*ghapp.CreatePullRequest, error) {
+	g.logger.Debug(ctx, "+GithubDirect.CreatePullRequest")
+	defer g.logger.Debug(ctx, "-GithubDirect.CreatePullRequest")
 	var ret ghapp.CreatePullRequest
 	if err := g.clientV4.Mutate(ctx, &ret, in, nil); err != nil {
 		return nil, fmt.Errorf("unable to mutate graphql for pull request: %w", err)
@@ -68,6 +72,8 @@ func (g *GithubDirect) GoGetAuthMethod() http.AuthMethod {
 }
 
 func (g *GithubDirect) GetContents(ctx context.Context, owner string, name string, file string) (string, error) {
+	g.logger.Debug(ctx, "+GithubDirect.GetContents")
+	defer g.logger.Debug(ctx, "-GithubDirect.GetContents")
 	// Note: Cannot find a way to do this with GraphQL
 	content, _, _, err := g.clientV3.Repositories.GetContents(ctx, owner, name, file, &github.RepositoryContentGetOptions{})
 	if err != nil {
@@ -81,6 +87,8 @@ func (g *GithubDirect) GetContents(ctx context.Context, owner string, name strin
 }
 
 func (g *GithubDirect) Self(ctx context.Context) (*ghapp.UserInfo, error) {
+	g.logger.Debug(ctx, "+GithubDirect.Self")
+	defer g.logger.Debug(ctx, "-GithubDirect.Self")
 	var q struct {
 		Viewer struct {
 			ghapp.UserInfo
@@ -93,6 +101,8 @@ func (g *GithubDirect) Self(ctx context.Context) (*ghapp.UserInfo, error) {
 }
 
 func (g *GithubDirect) AcceptPullRequest(ctx context.Context, _ string, _ string, in githubv4.AddPullRequestReviewInput) (*ghapp.AcceptPullRequestOutput, error) {
+	g.logger.Debug(ctx, "+GithubDirect.AcceptPullRequest")
+	defer g.logger.Debug(ctx, "-GithubDirect.AcceptPullRequest")
 	var ret ghapp.AcceptPullRequestOutput
 	if err := g.clientV4.Mutate(ctx, &ret, in, nil); err != nil {
 		return nil, fmt.Errorf("unable to graphql accept PR: %w", err)
@@ -101,6 +111,8 @@ func (g *GithubDirect) AcceptPullRequest(ctx context.Context, _ string, _ string
 }
 
 func (g *GithubDirect) MergePullRequest(ctx context.Context, _ string, _ string, in githubv4.MergePullRequestInput) (*ghapp.MergePullRequestOutput, error) {
+	g.logger.Debug(ctx, "+GithubDirect.MergePullRequest")
+	defer g.logger.Debug(ctx, "-GithubDirect.MergePullRequest")
 	var mergeMutation ghapp.MergePullRequestOutput
 	err := g.clientV4.Mutate(ctx, &mergeMutation, in, nil)
 	if err != nil {
@@ -110,6 +122,8 @@ func (g *GithubDirect) MergePullRequest(ctx context.Context, _ string, _ string,
 }
 
 func (g *GithubDirect) EveryOpenPullRequest(ctx context.Context, owner string, name string) (*ghapp.GraphQLPRQuery, error) {
+	g.logger.Debug(ctx, "+GithubDirect.EveryOpenPullRequest")
+	defer g.logger.Debug(ctx, "-GithubDirect.EveryOpenPullRequest")
 	var ret ghapp.GraphQLPRQuery
 	if err := g.clientV4.Query(ctx, &ret, map[string]interface{}{
 		"owner": githubv4.String(owner),

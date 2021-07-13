@@ -18,6 +18,8 @@ type PRMerger struct {
 }
 
 func (p *PRMerger) Execute(ctx context.Context) error {
+	p.Logger.Debug(ctx, "+PRMerger.Execute")
+	defer p.Logger.Debug(ctx, "-PRMerger.Execute")
 	for _, r := range p.AutobotConfig.Repos {
 		repoCfg, err := ghapp.FetchMasterConfigFile(ctx, p.Client, r)
 		if err != nil {

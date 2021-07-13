@@ -55,6 +55,8 @@ func NewCheckout(ctx context.Context, logger *zapctx.Logger, cfg autobotcfg.Repo
 }
 
 func (c *Checkout) Refresh(ctx context.Context) error {
+	c.Logger.Debug(ctx, "+Checkout.Refresh")
+	defer c.Logger.Debug(ctx, "-Checkout.Refresh")
 	remotes, err := c.Repo.Remotes()
 	if err != nil {
 		return fmt.Errorf("unable to list remotes: %w", err)
@@ -72,8 +74,10 @@ func (c *Checkout) Refresh(ctx context.Context) error {
 const gitopsAutobotDefaultBranch = "gitops-autobot-start"
 
 func (c *Checkout) Clean(ctx context.Context) error {
+	c.Logger.Debug(ctx, "+Checkout.Clean")
+	defer c.Logger.Debug(ctx, "-Checkout.Clean")
 	c.Logger.Debug(ctx, "cleaning")
-	w, base, err := c.SetupForWorkingTreeChanger()
+	w, base, err := c.SetupForWorkingTreeChanger(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to setup for cleaning: %w", err)
 	}
@@ -126,7 +130,9 @@ func (c *Checkout) Clean(ctx context.Context) error {
 
 const perRepoConfigFilename = ".gitops-autobot"
 
-func (c *Checkout) CurrentConfig() (*autobotcfg.AutobotPerRepoConfig, error) {
+func (c *Checkout) CurrentConfig(ctx context.Context) (*autobotcfg.AutobotPerRepoConfig, error) {
+	c.Logger.Debug(ctx, "+Checkout.CurrentConfig")
+	defer c.Logger.Debug(ctx, "-Checkout.CurrentConfig")
 	w, err := c.Repo.Worktree()
 	if err != nil {
 		return nil, fmt.Errorf("unable to get working tree: %w", err)
@@ -157,7 +163,9 @@ func (c *Checkout) CurrentConfig() (*autobotcfg.AutobotPerRepoConfig, error) {
 	return cfg, nil
 }
 
-func (c *Checkout) SetupForWorkingTreeChanger() (*git.Worktree, *object.Commit, error) {
+func (c *Checkout) SetupForWorkingTreeChanger(ctx context.Context) (*git.Worktree, *object.Commit, error) {
+	c.Logger.Debug(ctx, "+Checkout.SetupForWorkingTreeChanger")
+	defer c.Logger.Debug(ctx, "-Checkout.SetupForWorkingTreeChanger")
 	w, err := c.Repo.Worktree()
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to get working tree: %w", err)
@@ -175,6 +183,8 @@ func (c *Checkout) SetupForWorkingTreeChanger() (*git.Worktree, *object.Commit, 
 }
 
 func (c *Checkout) PushAllNewBranches(ctx context.Context, client ghapp.GithubAPI) error {
+	c.Logger.Debug(ctx, "+Checkout.PushAllNewBranches")
+	defer c.Logger.Debug(ctx, "-Checkout.PushAllNewBranches")
 	var branchesToPush []config.RefSpec
 	bItr, err := c.Repo.Branches()
 	if err != nil {

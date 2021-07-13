@@ -20,6 +20,8 @@ type PrReviewer struct {
 }
 
 func (p *PrReviewer) Execute(ctx context.Context) error {
+	p.Logger.Debug(ctx, "+PrReviewer.Execute")
+	defer p.Logger.Debug(ctx, "-PrReviewer.Execute")
 	for _, r := range p.AutobotConfig.Repos {
 		repoCfg, err := ghapp.FetchMasterConfigFile(ctx, p.Client, r)
 		if err != nil {

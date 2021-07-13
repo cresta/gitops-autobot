@@ -54,6 +54,10 @@ type RepoConfig struct {
 	Name   string `yaml:"name"`
 }
 
+func (r RepoConfig) String() string {
+	return fmt.Sprintf("%s/%s:%s", r.Owner, r.Name, r.Branch)
+}
+
 func (r RepoConfig) CloneURL() string {
 	return fmt.Sprintf("https://github.com/%s/%s.git", r.Owner, r.Name)
 }

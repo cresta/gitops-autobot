@@ -19,13 +19,15 @@ type PrCreator struct {
 }
 
 func (p *PrCreator) Execute(ctx context.Context, checkout *checkout.Checkout) error {
+	p.Logger.Debug(ctx, "+PrCreator.Execute")
+	defer p.Logger.Debug(ctx, "-PrCreator.Execute")
 	if err := checkout.Refresh(ctx); err != nil {
 		return fmt.Errorf("unable to refresh repo: %w", err)
 	}
 	if err := checkout.Clean(ctx); err != nil {
 		return fmt.Errorf("unable to clean repo: %w", err)
 	}
-	cfg, err := checkout.CurrentConfig()
+	cfg, err := checkout.CurrentConfig(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to get current config: %w", err)
 	}
@@ -41,7 +43,7 @@ func (p *PrCreator) Execute(ctx context.Context, checkout *checkout.Checkout) er
 		if err := checkout.Clean(ctx); err != nil {
 			return fmt.Errorf("unable to clean repo: %w", err)
 		}
-		wt, obj, err := checkout.SetupForWorkingTreeChanger()
+		wt, obj, err := checkout.SetupForWorkingTreeChanger(ctx)
 		if err != nil {
 			return fmt.Errorf("unable to setup working tree: %w", err)
 		}
