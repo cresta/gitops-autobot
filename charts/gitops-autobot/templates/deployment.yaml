@@ -31,10 +31,10 @@ spec:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          {{- if .Values.pd.envSecrets }}
+          {{- if .Values.envSecrets.envSecrets }}
           envFrom:
             - secretRef:
-                name: {{ .Values.pd.envSecrets }}
+                name: {{ .Values.envSecrets.envSecrets }}
           {{- end }}
           env:
             {{- if .Values.autobot.logLevel }}

@@ -33,6 +33,7 @@ autobot: {}
   # tracer: datadog
   # configFile: gitops-autobot.yaml
   # cronInterval: 90s
+  # envSecrets: [ ... ]
 
 securityContext: {}
   # capabilities:
