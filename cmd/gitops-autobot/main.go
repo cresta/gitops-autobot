@@ -38,8 +38,6 @@ type config struct {
 	DebugListenAddr string
 	Tracer          string
 	LogLevel        string
-	GithubRepos     string
-	AppPrivateKey   string
 	ConfigFile      string
 	CronInterval    time.Duration
 }
@@ -180,9 +178,9 @@ func (m *Service) Main() {
 }
 
 func (m *Service) injection(ctx context.Context, tracer gotracing.Tracing) error {
-	f, err := os.Open(m.config.GithubRepos)
+	f, err := os.Open(m.config.ConfigFile)
 	if err != nil {
-		return fmt.Errorf("unable to open file %s: %w", m.config.GithubRepos, err)
+		return fmt.Errorf("unable to open file %s: %w", m.config.ConfigFile, err)
 	}
 	defer func() {
 		m.log.IfErr(f.Close()).Error(ctx, "unable to close opened config file")
