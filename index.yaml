@@ -1,0 +1,14 @@
+apiVersion: v1
+entries:
+  gitops-autobot:
+  - apiVersion: v2
+    appVersion: 0.0.1
+    created: "2021-07-13T17:25:20.406779023Z"
+    description: A Helm chart for Kubernetes
+    digest: 7f5da7e53546c7ccd0e6aeae252198bc2ea43ff76cbb954d84386b25f14ced81
+    name: gitops-autobot
+    type: application
+    urls:
+    - https://github.com/cresta/gitops-autobot/releases/download/gitops-autobot-0.0.1/gitops-autobot-0.0.1.tgz
+    version: 0.0.1
+generated: "2021-07-13T17:25:20.269758228Z"
