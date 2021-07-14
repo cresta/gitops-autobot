@@ -27,7 +27,7 @@ func (t *TimeWorkingTreeChanger) NewContent(file filecontentchangemaker.Readable
 	if _, err := file.WriteTo(&buf); err != nil {
 		return nil, fmt.Errorf("unable to read from file %s: %w", file.Name(), err)
 	}
-	now := time.Now()
+	now := time.Now().UTC()
 	lines := strings.Split(buf.String(), "\n")
 	hasChange := false
 	format := t.Data.Format
@@ -39,8 +39,12 @@ func (t *TimeWorkingTreeChanger) NewContent(file filecontentchangemaker.Readable
 	}
 	for idx, line := range lines {
 		if strings.HasPrefix(line, "time=") {
+			newLine := "time=" + now.Format(format)
+			if lines[idx] == newLine {
+				continue
+			}
 			hasChange = true
-			lines[idx] = "time=" + now.Format(format)
+			lines[idx] = newLine
 		}
 	}
 	if hasChange {
