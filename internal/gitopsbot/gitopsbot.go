@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/cresta/gotracing"
+
 	"github.com/cresta/gitops-autobot/internal/checkout"
 	"github.com/cresta/gitops-autobot/internal/prcreator"
 	"github.com/cresta/gitops-autobot/internal/prmerger"
@@ -18,15 +20,22 @@ type GitopsBot struct {
 	PrReviewer   *prreviewer.PrReviewer
 	PRMerger     *prmerger.PRMerger
 	Checkouts    []*checkout.Checkout
+	Tracer       gotracing.Tracing
 	Logger       *zapctx.Logger
 	CronInterval time.Duration
 	cronTrigger  chan struct{}
 	stopTrigger  chan struct{}
 }
 
-func (g *GitopsBot) Execute(ctx context.Context) error {
-	g.Logger.Info(ctx, "+GitopsBot.Execute")
-	defer g.Logger.Info(ctx, "-GitopsBot.Execute")
+func (g *GitopsBot) execute(ctx context.Context) error {
+	return g.Tracer.StartSpanFromContext(ctx, gotracing.SpanConfig{
+		OperationName: "GitopsBot.execute",
+	}, g.executeNoTrace)
+}
+
+func (g *GitopsBot) executeNoTrace(ctx context.Context) error {
+	g.Logger.Info(ctx, "+GitopsBot.execute")
+	defer g.Logger.Info(ctx, "-GitopsBot.execute")
 	for _, c := range g.Checkouts {
 		l := g.Logger.With(zap.Stringer("checkout", c.RepoConfig))
 		if err := g.PRCreator.Execute(ctx, c); err != nil {
@@ -60,16 +69,15 @@ func (g *GitopsBot) Setup() {
 }
 
 func (g *GitopsBot) Cron(ctx context.Context) {
-
 	for {
 		select {
 		case <-g.stopTrigger:
 			return
 		case <-g.cronTrigger:
-			err := g.Execute(ctx)
+			err := g.execute(ctx)
 			g.Logger.IfErr(err).Warn(ctx, "unable to execute manual iteration of cron")
 		case <-time.After(g.CronInterval):
-			err := g.Execute(ctx)
+			err := g.execute(ctx)
 			g.Logger.IfErr(err).Warn(ctx, "unable to execute iteration of cron")
 		}
 	}

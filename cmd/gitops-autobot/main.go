@@ -10,6 +10,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/go-git/go-git/v5/plumbing/transport/client"
+
 	"github.com/cresta/gitops-autobot/internal/autobotcfg"
 	"github.com/cresta/gitops-autobot/internal/cache"
 	"github.com/cresta/gitops-autobot/internal/changemaker"
@@ -22,6 +24,7 @@ import (
 	"github.com/cresta/gitops-autobot/internal/prcreator"
 	"github.com/cresta/gitops-autobot/internal/prmerger"
 	"github.com/cresta/gitops-autobot/internal/prreviewer"
+	githttp "github.com/go-git/go-git/v5/plumbing/transport/http"
 
 	"github.com/cresta/gotracing"
 	"github.com/cresta/gotracing/datadog"
@@ -178,6 +181,12 @@ func (m *Service) Main() {
 }
 
 func (m *Service) injection(ctx context.Context, tracer gotracing.Tracing) error {
+	client.InstallProtocol("https", githttp.NewClient(&http.Client{
+		Transport: tracer.WrapRoundTrip(http.DefaultTransport),
+	}))
+	client.InstallProtocol("http", githttp.NewClient(&http.Client{
+		Transport: tracer.WrapRoundTrip(http.DefaultTransport),
+	}))
 	f, err := os.Open(m.config.ConfigFile)
 	if err != nil {
 		return fmt.Errorf("unable to open file %s: %w", m.config.ConfigFile, err)
@@ -258,6 +267,7 @@ func (m *Service) injection(ctx context.Context, tracer gotracing.Tracing) error
 		PrReviewer:   prReviewer,
 		PRMerger:     prMerger,
 		Checkouts:    allCheckouts,
+		Tracer:       tracer,
 		Logger:       m.log.With(zap.String("class", "gitopsbot")),
 		CronInterval: m.config.CronInterval,
 	}
