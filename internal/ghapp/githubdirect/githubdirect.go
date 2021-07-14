@@ -3,8 +3,9 @@ package githubdirect
 import (
 	"context"
 	"fmt"
-	"go.uber.org/zap"
 	http2 "net/http"
+
+	"go.uber.org/zap"
 
 	"github.com/bradleyfalzon/ghinstallation"
 	"github.com/cresta/gitops-autobot/internal/autobotcfg"
