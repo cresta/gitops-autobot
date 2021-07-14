@@ -277,7 +277,7 @@ func (m *Service) injection(ctx context.Context, tracer gotracing.Tracing) error
 func (m *Service) setupServer(cfg config, log *zapctx.Logger, tracer gotracing.Tracing) *http.Server {
 	rootHandler := mux.NewRouter()
 	rootHandler.Handle("/health", httpsimple.HealthHandler(log, tracer))
-	rootHandler.Methods(http.MethodPost).HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	rootHandler.Methods(http.MethodPost).Path("/trigger").HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		m.gitopsBot.TriggerNow()
 		writer.WriteHeader(http.StatusAccepted)
 		_, err := io.WriteString(writer, "triggered async")
