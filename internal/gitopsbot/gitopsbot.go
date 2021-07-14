@@ -23,6 +23,7 @@ type GitopsBot struct {
 	Tracer       gotracing.Tracing
 	Logger       *zapctx.Logger
 	CronInterval time.Duration
+	OnCron       func(ctx context.Context, logger *zapctx.Logger)
 	cronTrigger  chan struct{}
 	stopTrigger  chan struct{}
 }
@@ -36,6 +37,11 @@ func (g *GitopsBot) execute(ctx context.Context) error {
 func (g *GitopsBot) executeNoTrace(ctx context.Context) error {
 	g.Logger.Info(ctx, "+GitopsBot.execute")
 	defer g.Logger.Info(ctx, "-GitopsBot.execute")
+	defer func() {
+		if g.OnCron != nil {
+			g.OnCron(ctx, g.Logger)
+		}
+	}()
 	for _, c := range g.Checkouts {
 		l := g.Logger.With(zap.Stringer("checkout", c.RepoConfig))
 		if err := g.PRCreator.Execute(ctx, c); err != nil {

@@ -21,7 +21,7 @@ type CachedGithub struct {
 
 func (c *CachedGithub) DoesBranchExist(ctx context.Context, owner string, name string, ref string) (bool, error) {
 	var ret bool
-	if err := c.Cache.GetOrSet(ctx, c.generalKey("branchexist", owner, name, ref), time.Minute*10, &ret, func(ctx context.Context) (interface{}, error) {
+	if err := c.Cache.GetOrSet(ctx, c.generalKey("branchexist", owner, name, ref), time.Minute, &ret, func(ctx context.Context) (interface{}, error) {
 		return c.Into.DoesBranchExist(ctx, owner, name, ref)
 	}); err != nil {
 		return false, fmt.Errorf("unable to fetch from cache: %w", err)
@@ -79,7 +79,7 @@ func (c *CachedGithub) Self(ctx context.Context) (*ghapp.UserInfo, error) {
 
 func (c *CachedGithub) EveryOpenPullRequest(ctx context.Context, owner string, name string) (*ghapp.GraphQLPRQuery, error) {
 	var ret ghapp.GraphQLPRQuery
-	if err := c.Cache.GetOrSet(ctx, c.listPrsKey(owner, name), time.Hour, &ret, func(ctx context.Context) (interface{}, error) {
+	if err := c.Cache.GetOrSet(ctx, c.listPrsKey(owner, name), time.Minute, &ret, func(ctx context.Context) (interface{}, error) {
 		return c.Into.EveryOpenPullRequest(ctx, owner, name)
 	}); err != nil {
 		return nil, fmt.Errorf("unable to fetch from cache: %w", err)
@@ -105,6 +105,9 @@ func (c *CachedGithub) MergePullRequest(ctx context.Context, owner string, name 
 }
 
 func (c *CachedGithub) CreatePullRequest(ctx context.Context, owner string, name string, in githubv4.CreatePullRequestInput) (*ghapp.CreatePullRequest, error) {
+	if err := c.Cache.Delete(ctx, c.generalKey("branchexist", owner, name, string(in.HeadRefName))); err != nil {
+		return nil, fmt.Errorf("unable to clear out cache for branch: %w", err)
+	}
 	if err := c.Cache.Delete(ctx, c.listPrsKey(owner, name)); err != nil {
 		return nil, fmt.Errorf("unable to clear out cache: %w", err)
 	}

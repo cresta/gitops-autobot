@@ -57,6 +57,7 @@ func (p *PRMerger) processPr(ctx context.Context, pr ghapp.GraphQLPRQueryNode) e
 	}
 	if pr.Mergeable != githubv4.MergeableStateMergeable {
 		logger.Info(ctx, "cannot merge with state not clean", zap.String("state", string(pr.Mergeable)))
+		return nil
 	}
 	if !p.prAskingForAutoMerge(string(pr.Body)) {
 		logger.Debug(ctx, "pr not asking for review")

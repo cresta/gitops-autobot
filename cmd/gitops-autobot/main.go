@@ -206,14 +206,15 @@ func (m *Service) injection(ctx context.Context, tracer gotracing.Tracing) error
 	if err != nil {
 		return fmt.Errorf("unable to load committer from config: %w", err)
 	}
-	memoryCache := &cache.InMemoryCache{}
+	memoryCache1 := &cache.InMemoryCache{}
+	memoryCache2 := &cache.InMemoryCache{}
 	directPRCreatorClient, err := githubdirect.NewFromConfig(ctx, cfg.PRCreator, tracer.WrapRoundTrip(http.DefaultTransport), m.log)
 	if err != nil {
 		return fmt.Errorf("unable to make direct github client: %w", err)
 	}
 	cachedPRCreatorClient := &cachedgithub.CachedGithub{
 		Into:  directPRCreatorClient,
-		Cache: memoryCache,
+		Cache: memoryCache1,
 	}
 	prMaker, err := cachedPRCreatorClient.Self(ctx)
 	if err != nil {
@@ -225,7 +226,7 @@ func (m *Service) injection(ctx context.Context, tracer gotracing.Tracing) error
 	}
 	cachedPRReviewerClient := &cachedgithub.CachedGithub{
 		Into:  directPRReviewerClient,
-		Cache: memoryCache,
+		Cache: memoryCache2,
 	}
 	cfg, err = ghapp.PopulateRepoDefaultBranches(ctx, cfg, cachedPRCreatorClient)
 	if err != nil {
@@ -270,6 +271,10 @@ func (m *Service) injection(ctx context.Context, tracer gotracing.Tracing) error
 		Tracer:       tracer,
 		Logger:       m.log.With(zap.String("class", "gitopsbot")),
 		CronInterval: m.config.CronInterval,
+		OnCron: func(ctx context.Context, logger *zapctx.Logger) {
+			logger.IfErr(memoryCache1.Clear(ctx)).Warn(ctx, "unable to clear first cache")
+			logger.IfErr(memoryCache2.Clear(ctx)).Warn(ctx, "unable to clear second cache")
+		},
 	}
 	return nil
 }

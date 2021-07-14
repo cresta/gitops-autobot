@@ -16,6 +16,11 @@ type Cache interface {
 	Delete(ctx context.Context, key []byte) error
 }
 
+type ClearableCache interface {
+	Clear(ctx context.Context) error
+	Cache
+}
+
 type inMemoryKey struct {
 	expireAt time.Time
 	val      []byte
@@ -24,6 +29,16 @@ type inMemoryKey struct {
 type InMemoryCache struct {
 	cache map[string]inMemoryKey
 	mu    sync.Mutex
+}
+
+func (i *InMemoryCache) Clear(_ context.Context) error {
+	if i == nil {
+		return nil
+	}
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	i.cache = make(map[string]inMemoryKey)
+	return nil
 }
 
 func (i *InMemoryCache) GetOrSet(ctx context.Context, key []byte, ttl time.Duration, into interface{}, data func(ctx context.Context) (interface{}, error)) error {
@@ -78,4 +93,4 @@ func (i *InMemoryCache) Delete(_ context.Context, key []byte) error {
 	return nil
 }
 
-var _ Cache = &InMemoryCache{}
+var _ ClearableCache = &InMemoryCache{}

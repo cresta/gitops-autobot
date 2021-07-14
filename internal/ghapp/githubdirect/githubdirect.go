@@ -3,6 +3,7 @@ package githubdirect
 import (
 	"context"
 	"fmt"
+	"go.uber.org/zap"
 	http2 "net/http"
 
 	"github.com/bradleyfalzon/ghinstallation"
@@ -43,7 +44,7 @@ type GithubDirect struct {
 }
 
 func (g *GithubDirect) RepositoryInfo(ctx context.Context, owner string, name string) (*ghapp.RepositoryInfo, error) {
-	g.logger.Debug(ctx, "+GithubDirect.RepositoryInfo")
+	g.logger.Debug(ctx, "+GithubDirect.RepositoryInfo", zap.String("name", name))
 	defer g.logger.Debug(ctx, "-GithubDirect.RepositoryInfo")
 	var repoInfo ghapp.RepositoryInfo
 	if err := g.clientV4.Query(ctx, &repoInfo, map[string]interface{}{
@@ -56,7 +57,7 @@ func (g *GithubDirect) RepositoryInfo(ctx context.Context, owner string, name st
 }
 
 func (g *GithubDirect) CreatePullRequest(ctx context.Context, _ string, _ string, in githubv4.CreatePullRequestInput) (*ghapp.CreatePullRequest, error) {
-	g.logger.Debug(ctx, "+GithubDirect.CreatePullRequest")
+	g.logger.Debug(ctx, "+GithubDirect.CreatePullRequest", zap.String("headref", string(in.HeadRefName)))
 	defer g.logger.Debug(ctx, "-GithubDirect.CreatePullRequest")
 	var ret ghapp.CreatePullRequest
 	if err := g.clientV4.Mutate(ctx, &ret, in, nil); err != nil {
@@ -73,7 +74,7 @@ func (g *GithubDirect) GoGetAuthMethod() http.AuthMethod {
 }
 
 func (g *GithubDirect) GetContents(ctx context.Context, owner string, name string, file string) (string, error) {
-	g.logger.Debug(ctx, "+GithubDirect.GetContents")
+	g.logger.Debug(ctx, "+GithubDirect.GetContents", zap.String("name", name))
 	defer g.logger.Debug(ctx, "-GithubDirect.GetContents")
 	// Note: Cannot find a way to do this with GraphQL
 	content, _, _, err := g.clientV3.Repositories.GetContents(ctx, owner, name, file, &github.RepositoryContentGetOptions{})
@@ -101,8 +102,8 @@ func (g *GithubDirect) Self(ctx context.Context) (*ghapp.UserInfo, error) {
 	return &q.Viewer.UserInfo, nil
 }
 
-func (g *GithubDirect) AcceptPullRequest(ctx context.Context, _ string, _ string, in githubv4.AddPullRequestReviewInput) (*ghapp.AcceptPullRequestOutput, error) {
-	g.logger.Debug(ctx, "+GithubDirect.AcceptPullRequest")
+func (g *GithubDirect) AcceptPullRequest(ctx context.Context, owner string, name string, in githubv4.AddPullRequestReviewInput) (*ghapp.AcceptPullRequestOutput, error) {
+	g.logger.Debug(ctx, "+GithubDirect.AcceptPullRequest", zap.String("owner", owner), zap.String("name", name))
 	defer g.logger.Debug(ctx, "-GithubDirect.AcceptPullRequest")
 	var ret ghapp.AcceptPullRequestOutput
 	if err := g.clientV4.Mutate(ctx, &ret, in, nil); err != nil {
@@ -111,8 +112,8 @@ func (g *GithubDirect) AcceptPullRequest(ctx context.Context, _ string, _ string
 	return &ret, nil
 }
 
-func (g *GithubDirect) MergePullRequest(ctx context.Context, _ string, _ string, _ string, in githubv4.MergePullRequestInput) (*ghapp.MergePullRequestOutput, error) {
-	g.logger.Debug(ctx, "+GithubDirect.MergePullRequest")
+func (g *GithubDirect) MergePullRequest(ctx context.Context, _ string, name string, ref string, in githubv4.MergePullRequestInput) (*ghapp.MergePullRequestOutput, error) {
+	g.logger.Debug(ctx, "+GithubDirect.MergePullRequest", zap.String("name", name), zap.String("ref", ref))
 	defer g.logger.Debug(ctx, "-GithubDirect.MergePullRequest")
 	var mergeMutation ghapp.MergePullRequestOutput
 	err := g.clientV4.Mutate(ctx, &mergeMutation, in, nil)
@@ -123,7 +124,7 @@ func (g *GithubDirect) MergePullRequest(ctx context.Context, _ string, _ string,
 }
 
 func (g *GithubDirect) EveryOpenPullRequest(ctx context.Context, owner string, name string) (*ghapp.GraphQLPRQuery, error) {
-	g.logger.Debug(ctx, "+GithubDirect.EveryOpenPullRequest")
+	g.logger.Debug(ctx, "+GithubDirect.EveryOpenPullRequest", zap.String("name", name))
 	defer g.logger.Debug(ctx, "-GithubDirect.EveryOpenPullRequest")
 	var ret ghapp.GraphQLPRQuery
 	if err := g.clientV4.Query(ctx, &ret, map[string]interface{}{
@@ -136,6 +137,8 @@ func (g *GithubDirect) EveryOpenPullRequest(ctx context.Context, owner string, n
 }
 
 func (g *GithubDirect) DoesBranchExist(ctx context.Context, owner string, name string, ref string) (bool, error) {
+	g.logger.Debug(ctx, "+GithubDirect.DoesBranchExist", zap.String("branch", ref))
+	defer g.logger.Debug(ctx, "-GithubDirect.DoesBranchExist")
 	var query struct {
 		Repository struct {
 			Ref *struct {
