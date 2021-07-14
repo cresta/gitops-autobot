@@ -170,7 +170,7 @@ func (m *Service) Main() {
 	m.gitopsBot.Setup()
 	go m.gitopsBot.Cron(ctx)
 	serveErr := httpsimple.BasicServerRun(m.log, m.server, m.onListen, m.config.ListenAddr)
-
+	m.gitopsBot.Stop()
 	shutdownCallback()
 	if serveErr != nil {
 		m.osExit(1)
@@ -267,6 +267,12 @@ func (m *Service) injection(ctx context.Context, tracer gotracing.Tracing) error
 func (m *Service) setupServer(cfg config, log *zapctx.Logger, tracer gotracing.Tracing) *http.Server {
 	rootHandler := mux.NewRouter()
 	rootHandler.Handle("/health", httpsimple.HealthHandler(log, tracer))
+	rootHandler.Methods(http.MethodPost).HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		m.gitopsBot.TriggerNow()
+		writer.WriteHeader(http.StatusAccepted)
+		_, err := io.WriteString(writer, "triggered async")
+		m.log.IfErr(err).Warn(request.Context(), "unable to write out status")
+	})
 	return &http.Server{
 		Addr:    cfg.ListenAddr,
 		Handler: rootHandler,
