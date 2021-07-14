@@ -215,6 +215,12 @@ func (c *Checkout) PushAllNewBranches(ctx context.Context, client ghapp.GithubAP
 		return fmt.Errorf("unable to execute graphql query: %w", err)
 	}
 	for _, b := range branchesToPush {
+		if exists, err := client.DoesBranchExist(ctx, c.RepoConfig.Owner, c.RepoConfig.Name, b.Src()); err != nil {
+			c.Logger.IfErr(err).Warn(ctx, "unable to verify if branch exists.  Assume it does not")
+		} else if exists {
+			c.Logger.Debug(ctx, "branch exists.  Skipping another PR")
+			continue
+		}
 		// Fetch commit object to build github PR message
 		err = c.Repo.PushContext(ctx, &git.PushOptions{
 			RemoteName: "origin",

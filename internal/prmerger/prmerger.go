@@ -80,7 +80,7 @@ func (p *PRMerger) processPr(ctx context.Context, pr ghapp.GraphQLPRQueryNode) e
 	}
 
 	method := githubv4.PullRequestMergeMethodSquash
-	if _, err := p.Client.MergePullRequest(ctx, string(pr.Repository.Owner.Login), string(pr.Repository.Name), githubv4.MergePullRequestInput{
+	if _, err := p.Client.MergePullRequest(ctx, string(pr.Repository.Owner.Login), string(pr.Repository.Name), string(pr.BaseRef.Name), githubv4.MergePullRequestInput{
 		PullRequestID:   pr.ID,
 		ExpectedHeadOid: &pr.HeadRef.Target.Oid,
 		MergeMethod:     &method,

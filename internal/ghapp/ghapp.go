@@ -17,8 +17,9 @@ type GithubAPI interface {
 	GetContents(ctx context.Context, owner string, name string, file string) (string, error)
 	Self(ctx context.Context) (*UserInfo, error)
 	AcceptPullRequest(ctx context.Context, owner string, name string, in githubv4.AddPullRequestReviewInput) (*AcceptPullRequestOutput, error)
-	MergePullRequest(ctx context.Context, owner string, name string, in githubv4.MergePullRequestInput) (*MergePullRequestOutput, error)
+	MergePullRequest(ctx context.Context, owner string, name string, ref string, in githubv4.MergePullRequestInput) (*MergePullRequestOutput, error)
 	EveryOpenPullRequest(ctx context.Context, owner string, name string) (*GraphQLPRQuery, error)
+	DoesBranchExist(ctx context.Context, owner string, name string, ref string) (bool, error)
 }
 
 type RepositoryInfo struct {
@@ -52,7 +53,10 @@ type GraphQLPRQueryNode struct {
 	UpdatedAt         githubv4.DateTime
 	ReviewDecision    githubv4.PullRequestReviewDecision
 	IsCrossRepository githubv4.Boolean
-	Repository        struct {
+	BaseRef           struct {
+		Name githubv4.String
+	}
+	Repository struct {
 		Owner struct {
 			Login githubv4.String
 		}

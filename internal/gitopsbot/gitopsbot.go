@@ -25,8 +25,8 @@ type GitopsBot struct {
 }
 
 func (g *GitopsBot) Execute(ctx context.Context) error {
-	g.Logger.Debug(ctx, "+GitopsBot.Execute")
-	defer g.Logger.Debug(ctx, "-GitopsBot.Execute")
+	g.Logger.Info(ctx, "+GitopsBot.Execute")
+	defer g.Logger.Info(ctx, "-GitopsBot.Execute")
 	for _, c := range g.Checkouts {
 		l := g.Logger.With(zap.Stringer("checkout", c.RepoConfig))
 		if err := g.PRCreator.Execute(ctx, c); err != nil {

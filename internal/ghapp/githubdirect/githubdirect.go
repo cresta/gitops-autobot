@@ -111,7 +111,7 @@ func (g *GithubDirect) AcceptPullRequest(ctx context.Context, _ string, _ string
 	return &ret, nil
 }
 
-func (g *GithubDirect) MergePullRequest(ctx context.Context, _ string, _ string, in githubv4.MergePullRequestInput) (*ghapp.MergePullRequestOutput, error) {
+func (g *GithubDirect) MergePullRequest(ctx context.Context, _ string, _ string, _ string, in githubv4.MergePullRequestInput) (*ghapp.MergePullRequestOutput, error) {
 	g.logger.Debug(ctx, "+GithubDirect.MergePullRequest")
 	defer g.logger.Debug(ctx, "-GithubDirect.MergePullRequest")
 	var mergeMutation ghapp.MergePullRequestOutput
@@ -133,4 +133,22 @@ func (g *GithubDirect) EveryOpenPullRequest(ctx context.Context, owner string, n
 		return nil, fmt.Errorf("unable to query graphql: %w", err)
 	}
 	return &ret, nil
+}
+
+func (g *GithubDirect) DoesBranchExist(ctx context.Context, owner string, name string, ref string) (bool, error) {
+	var query struct {
+		Repository struct {
+			Ref *struct {
+				Name githubv4.String
+			} `graphql:"ref(qualifiedName: $ref)"`
+		} `graphql:"repository(owner: $owner, name: $name)"`
+	}
+	if err := g.clientV4.Query(ctx, &query, map[string]interface{}{
+		"owner": githubv4.String(owner),
+		"name":  githubv4.String(name),
+		"ref":   githubv4.String(ref),
+	}); err != nil {
+		return false, fmt.Errorf("unable to query graphql: %w", err)
+	}
+	return query.Repository.Ref != nil, nil
 }
