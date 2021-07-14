@@ -37,6 +37,12 @@ spec:
                 name: {{ .Values.autobot.envSecrets }}
           {{- end }}
           env:
+            {{- if .Values.autobot.env }}
+            {{- range .Values.autobot.env }}
+            - name: {{ .name }}
+              value: {{ .value }}
+            {{- end }}
+            {{- end }}
             {{- if .Values.autobot.logLevel }}
             - name: LOG_LEVEL
               value: {{ .Values.autobot.logLevel | quote }}
