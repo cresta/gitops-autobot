@@ -11,8 +11,10 @@ require (
 	github.com/cresta/httpsimple v0.0.1
 	github.com/cresta/magehelper v0.0.51
 	github.com/cresta/zapctx v0.0.1
+	github.com/cyphar/filepath-securejoin v0.2.3 // indirect
 	github.com/go-git/go-git/v5 v5.4.2
-	github.com/go-logfmt/logfmt v0.5.0 // indirect
+	github.com/go-logfmt/logfmt v0.5.0
+	github.com/goccy/go-yaml v1.8.10
 	github.com/google/go-github/v29 v29.0.3
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/google/uuid v1.3.0 // indirect
@@ -34,4 +36,7 @@ require (
 	google.golang.org/protobuf v1.27.1 // indirect
 	gopkg.in/DataDog/dd-trace-go.v1 v1.31.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0
+	helm.sh/helm/v3 v3.6.3
+	k8s.io/client-go v0.21.2 // indirect
+	rsc.io/letsencrypt v0.0.3 // indirect
 )
