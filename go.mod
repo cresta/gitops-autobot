@@ -4,6 +4,7 @@ go 1.16
 
 require (
 	github.com/DataDog/datadog-go v4.8.0+incompatible // indirect
+	github.com/Masterminds/semver/v3 v3.1.1
 	github.com/Microsoft/go-winio v0.5.0 // indirect
 	github.com/ProtonMail/go-crypto v0.0.0-20210707164159-52430bf6b52c // indirect
 	github.com/bradleyfalzon/ghinstallation v1.1.1

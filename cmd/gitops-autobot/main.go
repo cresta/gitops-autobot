@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/cresta/gitops-autobot/internal/changemaker/filecontentchangemaker/helmchangemaker"
+	"github.com/cresta/gitops-autobot/internal/versionfetch/helm"
 	"io"
 	"net"
 	"net/http"
@@ -181,12 +183,11 @@ func (m *Service) Main() {
 }
 
 func (m *Service) injection(ctx context.Context, tracer gotracing.Tracing) error {
-	client.InstallProtocol("https", githttp.NewClient(&http.Client{
+	tracedClient := &http.Client{
 		Transport: tracer.WrapRoundTrip(http.DefaultTransport),
-	}))
-	client.InstallProtocol("http", githttp.NewClient(&http.Client{
-		Transport: tracer.WrapRoundTrip(http.DefaultTransport),
-	}))
+	}
+	client.InstallProtocol("https", githttp.NewClient(tracedClient))
+	client.InstallProtocol("http", githttp.NewClient(tracedClient))
 	f, err := os.Open(m.config.ConfigFile)
 	if err != nil {
 		return fmt.Errorf("unable to open file %s: %w", m.config.ConfigFile, err)
@@ -242,7 +243,22 @@ func (m *Service) injection(ctx context.Context, tracer gotracing.Tracing) error
 	}
 	factory := changemaker.Factory{
 		Factories: []changemaker.WorkingTreeChangerFactory{
-			timechangemaker.Factory,
+			timechangemaker.Factory, helmchangemaker.MakeFactory(&helm.RepoInfoLoader{
+				Client: tracedClient,
+				Logger: m.log,
+				LoadersByScheme: map[string]helm.IndexLoader{
+					"https": &helm.HttpLoader{
+						Logger: m.log,
+						Client: tracedClient,
+					},
+					"http": &helm.HttpLoader{
+						Logger: m.log,
+						Client: tracedClient,
+					},
+				},
+			}, &helm.ChangeParser{
+				Logger: m.log,
+			}),
 		},
 	}
 	prCreator := &prcreator.PrCreator{

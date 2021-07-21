@@ -6,25 +6,6 @@ import (
 	"testing"
 )
 
-const testChartDeps = `apiVersion: v2
-name: example-chart-yaml
-description: An umbrella chart
-icon: https://cresta.com/icons/icon-48x48.png
-
-type: application
-
-version: 0.4.6
-
-appVersion: v0.16.0
-
-dependencies:
-  - name: cert-manager
-    repository: https://charts.jetstack.io
-    version: "v1.1.0"
-maintainers:
-- name: some-team
-`
-
 const testHelmReleaseFlux = `apiVersion: helm.fluxcd.io/v1
 kind: HelmRelease
 metadata:
@@ -52,13 +33,13 @@ func TestParse(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 1, len(ret))
 	require.Equal(t, LineHelmChange{
-		upgradeInfo: helmUpgradeInfo{
+		UpgradeInfo: UpgradeInfo{
 			Repository:        "https://cresta.github.io/gitdb/",
 			ChartName:         "gitdb",
 			CurrentVersion:    "0.1.25",
 			VersionConstraint: "1.x.x",
 		},
-		currentVersionLine:       "    version: 0.1.25",
-		currentVersionLineNumber: 11,
+		CurrentVersionLine:       "    version: 0.1.25",
+		CurrentVersionLineNumber: 11,
 	}, *ret[0])
 }

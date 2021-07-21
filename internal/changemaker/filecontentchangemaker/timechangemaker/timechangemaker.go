@@ -2,6 +2,7 @@ package timechangemaker
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -22,7 +23,7 @@ type TimeWorkingTreeChangerData struct {
 
 const defaultLayout = "2006-01-02 15:04:05.999999999 -0700 MST"
 
-func (t *TimeWorkingTreeChanger) NewContent(file filecontentchangemaker.ReadableFile) (*filecontentchangemaker.FileChange, error) {
+func (t *TimeWorkingTreeChanger) NewContent(_ context.Context, file filecontentchangemaker.ReadableFile) (*filecontentchangemaker.FileChange, error) {
 	var buf bytes.Buffer
 	if _, err := file.WriteTo(&buf); err != nil {
 		return nil, fmt.Errorf("unable to read from file %s: %w", file.Name(), err)

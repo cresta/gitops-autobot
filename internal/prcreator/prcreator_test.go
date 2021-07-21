@@ -3,6 +3,8 @@ package prcreator
 import (
 	"bytes"
 	"context"
+	"github.com/cresta/gitops-autobot/internal/changemaker/filecontentchangemaker/helmchangemaker"
+	"github.com/cresta/gitops-autobot/internal/versionfetch/helm"
 	"io"
 	"io/ioutil"
 	http2 "net/http"
@@ -32,7 +34,22 @@ func TestPrCreator_Execute(t *testing.T) {
 	logger := testhelp.ZapTestingLogger(t)
 	factory := changemaker.Factory{
 		Factories: []changemaker.WorkingTreeChangerFactory{
-			timechangemaker.Factory,
+			timechangemaker.Factory, helmchangemaker.MakeFactory(&helm.RepoInfoLoader{
+				Client: http2.DefaultClient,
+				Logger: logger,
+				LoadersByScheme: map[string]helm.IndexLoader{
+					"https": &helm.HttpLoader{
+						Logger: logger,
+						Client: http2.DefaultClient,
+					},
+					"http": &helm.HttpLoader{
+						Logger: logger,
+						Client: http2.DefaultClient,
+					},
+				},
+			}, &helm.ChangeParser{
+				Logger: logger,
+			}),
 		},
 	}
 	testRepoCfg := "test-repo-config.yaml"

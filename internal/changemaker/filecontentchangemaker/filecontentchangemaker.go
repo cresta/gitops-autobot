@@ -1,6 +1,7 @@
 package filecontentchangemaker
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -57,6 +58,7 @@ func (g *gitFile) Name() string {
 var _ ReadableFile = &gitFile{}
 
 func (f *FileContentWorkingTreeChanger) ChangeWorkingTree(w *git.Worktree, baseCommit *object.Commit, gitCommitter changemaker.GitCommitter) error {
+	ctx := context.TODO()
 	files, err := baseCommit.Files()
 	if err != nil {
 		return fmt.Errorf("unable to list files: %w", err)
@@ -67,7 +69,7 @@ func (f *FileContentWorkingTreeChanger) ChangeWorkingTree(w *git.Worktree, baseC
 			return nil
 		}
 		gf := gitFile{file: file}
-		fc, err := f.ContentChangeCheck.NewContent(&gf)
+		fc, err := f.ContentChangeCheck.NewContent(ctx, &gf)
 		if err != nil {
 			return fmt.Errorf("unable to get new content for file %s: %w", file.Name, err)
 		}
@@ -184,7 +186,7 @@ type ExpectedChange struct {
 }
 
 type ContentChangeCheck interface {
-	NewContent(file ReadableFile) (*FileChange, error)
+	NewContent(ctx context.Context, file ReadableFile) (*FileChange, error)
 }
 
 var _ changemaker.WorkingTreeChanger = &FileContentWorkingTreeChanger{}
