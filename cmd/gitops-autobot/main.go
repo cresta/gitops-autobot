@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/cresta/gitops-autobot/internal/changemaker/filecontentchangemaker/helmchangemaker"
-	"github.com/cresta/gitops-autobot/internal/versionfetch/helm"
 	"io"
 	"net"
 	"net/http"
 	"os"
 	"time"
+
+	"github.com/cresta/gitops-autobot/internal/changemaker/filecontentchangemaker/helmchangemaker"
+	"github.com/cresta/gitops-autobot/internal/versionfetch/helm"
 
 	"github.com/go-git/go-git/v5/plumbing/transport/client"
 

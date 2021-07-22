@@ -1,9 +1,10 @@
 package helm
 
 import (
-	"github.com/stretchr/testify/require"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 const testHelmReleaseFlux = `apiVersion: helm.fluxcd.io/v1

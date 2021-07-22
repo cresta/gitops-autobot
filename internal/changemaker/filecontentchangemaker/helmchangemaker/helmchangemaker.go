@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"strings"
+
 	"github.com/cresta/gitops-autobot/internal/autobotcfg"
 	"github.com/cresta/gitops-autobot/internal/changemaker"
 	"github.com/cresta/gitops-autobot/internal/changemaker/filecontentchangemaker"
 	"github.com/cresta/gitops-autobot/internal/versionfetch/helm"
 	"github.com/cresta/zapctx"
 	"go.uber.org/zap"
-	"strings"
 )
 
 type HelmChangeMaker struct {

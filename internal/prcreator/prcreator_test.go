@@ -3,13 +3,14 @@ package prcreator
 import (
 	"bytes"
 	"context"
-	"github.com/cresta/gitops-autobot/internal/changemaker/filecontentchangemaker/helmchangemaker"
-	"github.com/cresta/gitops-autobot/internal/versionfetch/helm"
 	"io"
 	"io/ioutil"
 	http2 "net/http"
 	"os"
 	"testing"
+
+	"github.com/cresta/gitops-autobot/internal/changemaker/filecontentchangemaker/helmchangemaker"
+	"github.com/cresta/gitops-autobot/internal/versionfetch/helm"
 
 	"github.com/cresta/gitops-autobot/internal/autobotcfg"
 	"github.com/cresta/gitops-autobot/internal/cache"

@@ -3,12 +3,6 @@ package helm
 import (
 	"context"
 	"fmt"
-	"github.com/Masterminds/semver/v3"
-	"github.com/cresta/gitops-autobot/internal/cache"
-	"github.com/cresta/zapctx"
-	"github.com/go-logfmt/logfmt"
-	"github.com/goccy/go-yaml"
-	"helm.sh/helm/v3/pkg/repo"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -17,6 +11,13 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/Masterminds/semver/v3"
+	"github.com/cresta/gitops-autobot/internal/cache"
+	"github.com/cresta/zapctx"
+	"github.com/go-logfmt/logfmt"
+	"github.com/goccy/go-yaml"
+	"helm.sh/helm/v3/pkg/repo"
 )
 
 type UpgradeInfo struct {
