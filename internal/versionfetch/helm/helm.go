@@ -53,7 +53,7 @@ func GroupChangesByRepo(changes []*LineHelmChange) map[string][]*LineHelmChange 
 }
 
 func ParseHelmReleaseYAML(lines []string) ([]*LineHelmChange, error) {
-	var ret []*LineHelmChange
+	ret := make([]*LineHelmChange, 0, 3) // most files will have only a few changes.
 	for idx, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if len(trimmed) == 0 {
@@ -176,15 +176,15 @@ func yamlIndent(line string) int {
 	return len(line) - len(strings.TrimLeft(line, " -"))
 }
 
-type HttpLoader struct {
+type HTTPLoader struct {
 	Logger *zapctx.Logger
 	Client *http.Client
 }
 
-func (h *HttpLoader) LoadIndexFile(ctx context.Context, url string) (*repo.IndexFile, error) {
+func (h *HTTPLoader) LoadIndexFile(ctx context.Context, url string) (*repo.IndexFile, error) {
 	url = strings.TrimSuffix(url, "/")
 	url = strings.TrimSuffix(url, "/index.yaml")
-	url = url + "/index.yaml"
+	url += "/index.yaml"
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("unable to construct request object: %w", err)
@@ -207,10 +207,13 @@ func (h *HttpLoader) LoadIndexFile(ctx context.Context, url string) (*repo.Index
 	return ret, nil
 }
 
-var _ IndexLoader = &HttpLoader{}
+var _ IndexLoader = &HTTPLoader{}
 
 func LoadFromReader(ctx context.Context, reader io.Reader, logger *zapctx.Logger) (*repo.IndexFile, error) {
 	f, err := ioutil.TempFile("", "helm_load_from_reader")
+	if err != nil {
+		return nil, fmt.Errorf("unable to make new temp file: %w", err)
+	}
 	defer func() {
 		closeErr := f.Close()
 		if closeErr != nil {
@@ -251,8 +254,6 @@ func (c *ChangeParser) LoadVersions(_ context.Context, change *LineHelmChange, i
 	if len(allVersions) == 0 {
 		return nil, nil
 	}
-	matchingVersions := make([]string, 0)
-	matchingVersions = append(matchingVersions, change.UpgradeInfo.CurrentVersion)
 	currentVersion, err := semver.NewVersion(change.UpgradeInfo.CurrentVersion)
 	if err != nil {
 		return nil, fmt.Errorf("uanble to parse current version: %w", err)

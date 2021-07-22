@@ -252,11 +252,11 @@ func (m *Service) injection(ctx context.Context, tracer gotracing.Tracing) error
 				Client: tracedClient,
 				Logger: m.log,
 				LoadersByScheme: map[string]helm.IndexLoader{
-					"https": &helm.HttpLoader{
+					"https": &helm.HTTPLoader{
 						Logger: m.log,
 						Client: tracedClient,
 					},
-					"http": &helm.HttpLoader{
+					"http": &helm.HTTPLoader{
 						Logger: m.log,
 						Client: tracedClient,
 					},

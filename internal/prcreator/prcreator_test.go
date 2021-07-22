@@ -40,11 +40,11 @@ func TestPrCreator_Execute(t *testing.T) {
 				Client: http2.DefaultClient,
 				Logger: logger,
 				LoadersByScheme: map[string]helm.IndexLoader{
-					"https": &helm.HttpLoader{
+					"https": &helm.HTTPLoader{
 						Logger: logger,
 						Client: http2.DefaultClient,
 					},
-					"http": &helm.HttpLoader{
+					"http": &helm.HTTPLoader{
 						Logger: logger,
 						Client: http2.DefaultClient,
 					},
