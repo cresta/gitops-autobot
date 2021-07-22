@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/Masterminds/semver/v3"
+	"github.com/cresta/gitops-autobot/internal/cache"
 	"github.com/cresta/zapctx"
 	"github.com/go-logfmt/logfmt"
 	"github.com/goccy/go-yaml"
@@ -13,7 +14,9 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
+	"time"
 )
 
 type UpgradeInfo struct {
@@ -21,6 +24,8 @@ type UpgradeInfo struct {
 	ChartName         string
 	CurrentVersion    string
 	VersionConstraint string
+	AutoMerge         *bool
+	AutoApprove       *bool
 }
 
 type LineHelmChange struct {
@@ -107,6 +112,20 @@ func ParseHelmReleaseYAML(lines []string) ([]*LineHelmChange, error) {
 		if version, exists := keys["currentVersion"]; exists {
 			thisChange.UpgradeInfo.CurrentVersion = version
 		}
+		if autoMergeStr, exists := keys["autoMerge"]; exists {
+			parsed, err := strconv.ParseBool(autoMergeStr)
+			if err != nil {
+				return nil, fmt.Errorf("invalid flag %s: %w", "autoMerge", err)
+			}
+			thisChange.UpgradeInfo.AutoMerge = &parsed
+		}
+		if autoAcceptStr, exists := keys["autoAccept"]; exists {
+			parsed, err := strconv.ParseBool(autoAcceptStr)
+			if err != nil {
+				return nil, fmt.Errorf("invalid flag %s: %w", "autoAccept", err)
+			}
+			thisChange.UpgradeInfo.AutoApprove = &parsed
+		}
 
 		if _, err := semver.NewConstraint(thisChange.UpgradeInfo.VersionConstraint); err != nil {
 			return nil, fmt.Errorf("invalid version constraint %s: %w", thisChange.UpgradeInfo.VersionConstraint, err)
@@ -127,22 +146,29 @@ type RepoInfoLoader struct {
 	Client          *http.Client
 	Logger          *zapctx.Logger
 	LoadersByScheme map[string]IndexLoader
+	Cache           cache.Cache
 }
 
 type IndexLoader interface {
 	LoadIndexFile(ctx context.Context, repo string) (*repo.IndexFile, error)
 }
 
-func (r *RepoInfoLoader) LoadIndexFile(ctx context.Context, repo string) (*repo.IndexFile, error) {
-	u, err := url.Parse(repo)
+func (r *RepoInfoLoader) LoadIndexFile(ctx context.Context, repoURL string) (*repo.IndexFile, error) {
+	u, err := url.Parse(repoURL)
 	if err != nil {
-		return nil, fmt.Errorf("unable to parse repo url %s: %w", repo, err)
+		return nil, fmt.Errorf("unable to parse repo url %s: %w", repoURL, err)
 	}
 	loader, exists := r.LoadersByScheme[u.Scheme]
 	if !exists {
-		return nil, fmt.Errorf("unable to load index file for URL (unknown scheme): %s", repo)
+		return nil, fmt.Errorf("unable to load index file for URL (unknown scheme): %s", repoURL)
 	}
-	return loader.LoadIndexFile(ctx, repo)
+	var ret repo.IndexFile
+	if err := r.Cache.GetOrSet(ctx, []byte("helm_index:"+repoURL), time.Minute*5, &ret, func(ctx context.Context) (interface{}, error) {
+		return loader.LoadIndexFile(ctx, repoURL)
+	}); err != nil {
+		return nil, fmt.Errorf("unable to load or get from cache: %w", err)
+	}
+	return &ret, nil
 }
 
 func yamlIndent(line string) int {

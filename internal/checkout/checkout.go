@@ -85,12 +85,6 @@ func (c *Checkout) Clean(ctx context.Context) error {
 	if err := c.Repo.Storer.SetReference(plumbing.NewHashReference(plumbing.NewBranchReferenceName(gitopsAutobotDefaultBranch), base.Hash)); err != nil {
 		return fmt.Errorf("unable to set new branch ref: %w", err)
 	}
-	if err := w.Reset(&git.ResetOptions{
-		Mode:   git.HardReset,
-		Commit: base.Hash,
-	}); err != nil {
-		return fmt.Errorf("unable to reset working tree: %w", err)
-	}
 	if err := w.Clean(&git.CleanOptions{
 		Dir: true,
 	}); err != nil {
@@ -244,7 +238,7 @@ func (c *Checkout) PushAllNewBranches(ctx context.Context, client ghapp.GithubAP
 		prObj.Head = github.String(b.Reverse().Src())
 		if _, err := client.CreatePullRequest(ctx, c.RepoConfig.Owner, c.RepoConfig.Name, githubv4.CreatePullRequestInput{
 			RepositoryID: repoInfo.Repository.ID,
-			BaseRefName:  "main",
+			BaseRefName:  repoInfo.Repository.DefaultBranchRef.Name,
 			HeadRefName:  githubv4.String(b.Src()),
 			Title:        githubv4.String(*prObj.Title),
 			Body:         githubv4.NewString(githubv4.String(*prObj.Body)),

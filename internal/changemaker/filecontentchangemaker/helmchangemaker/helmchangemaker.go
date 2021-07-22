@@ -8,12 +8,15 @@ import (
 	"github.com/cresta/gitops-autobot/internal/changemaker"
 	"github.com/cresta/gitops-autobot/internal/changemaker/filecontentchangemaker"
 	"github.com/cresta/gitops-autobot/internal/versionfetch/helm"
+	"github.com/cresta/zapctx"
+	"go.uber.org/zap"
 	"strings"
 )
 
 type HelmChangeMaker struct {
 	RepoInfoLoader *helm.RepoInfoLoader
 	Parser         *helm.ChangeParser
+	Logger         *zapctx.Logger
 }
 
 func (h *HelmChangeMaker) NewContent(ctx context.Context, file filecontentchangemaker.ReadableFile) (*filecontentchangemaker.FileChange, error) {
@@ -29,6 +32,8 @@ func (h *HelmChangeMaker) NewContent(ctx context.Context, file filecontentchange
 	byRepo := helm.GroupChangesByRepo(changes)
 	hasChange := false
 	changeCommitMsg := ""
+	autoMerge := false
+	autoApprove := false
 	for repoURL, changesByRepo := range byRepo {
 		idxFile, err := h.RepoInfoLoader.LoadIndexFile(ctx, repoURL)
 		if err != nil {
@@ -42,6 +47,13 @@ func (h *HelmChangeMaker) NewContent(ctx context.Context, file filecontentchange
 			if thisChange == nil {
 				continue
 			}
+			h.Logger.Debug(ctx, "line change", zap.String("old", change.CurrentVersionLine), zap.String("new", thisChange.NewLine))
+			if change.UpgradeInfo.AutoMerge != nil {
+				autoMerge = autoMerge || *change.UpgradeInfo.AutoMerge
+			}
+			if change.UpgradeInfo.AutoApprove != nil {
+				autoApprove = autoApprove || *change.UpgradeInfo.AutoApprove
+			}
 			changeCommitMsg += fmt.Sprintf("Changed %s %s => %s\n", change.UpgradeInfo.ChartName, change.UpgradeInfo.CurrentVersion, thisChange.NewVersion)
 			lines[thisChange.LineNumber] = thisChange.NewLine
 			hasChange = true
@@ -53,12 +65,14 @@ func (h *HelmChangeMaker) NewContent(ctx context.Context, file filecontentchange
 			CommitTitle:   "Deploying new helm version",
 			CommitMessage: changeCommitMsg,
 			GroupHash:     "",
+			AutoMerge:     autoMerge,
+			AutoApprove:   autoApprove,
 		}, nil
 	}
 	return nil, nil
 }
 
-func MakeFactory(repoInfoLoader *helm.RepoInfoLoader, parser *helm.ChangeParser) changemaker.WorkingTreeChangerFactory {
+func MakeFactory(repoInfoLoader *helm.RepoInfoLoader, parser *helm.ChangeParser, logger *zapctx.Logger) changemaker.WorkingTreeChangerFactory {
 	return func(cfg autobotcfg.ChangeMakerConfig, perRepo autobotcfg.PerRepoChangeMakerConfig) ([]changemaker.WorkingTreeChanger, error) {
 		if cfg.Name != "helm" {
 			return nil, nil
@@ -73,6 +87,7 @@ func MakeFactory(repoInfoLoader *helm.RepoInfoLoader, parser *helm.ChangeParser)
 				PerRepo: perRepo,
 				ContentChangeCheck: &HelmChangeMaker{
 					Parser:         parser,
+					Logger:         logger,
 					RepoInfoLoader: repoInfoLoader,
 				},
 			},

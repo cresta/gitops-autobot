@@ -27,7 +27,7 @@ func CommitterFromConfig(config autobotcfg.CommitterConfig) (GitCommitter, error
 
 var _ GitCommitter = &gitCommitter{}
 
-func (g *gitCommitter) Commit(w *git.Worktree, msg string, opts *git.CommitOptions, _ autobotcfg.ChangeMakerConfig, perRepo autobotcfg.PerRepoChangeMakerConfig) (plumbing.Hash, error) {
+func (g *gitCommitter) Commit(w *git.Worktree, msg string, opts *git.CommitOptions, _ autobotcfg.ChangeMakerConfig, perRepo autobotcfg.PerRepoChangeMakerConfig, annotations *CommitAnnotations) (plumbing.Hash, error) {
 	now := time.Now()
 	var co git.CommitOptions
 	if g.DefaultCommitOptions != nil {
@@ -54,12 +54,28 @@ func (g *gitCommitter) Commit(w *git.Worktree, msg string, opts *git.CommitOptio
 	if co.Committer != nil && co.Committer.When.IsZero() {
 		co.Committer.When = now
 	}
-	msg = tagCommitMessage(msg, perRepo)
+	annotations = MergeAnnotations(AnnotationsFromConfig(perRepo), annotations)
+	msg = annotations.tagCommitMessage(msg)
 	return w.Commit(msg, &co)
 }
 
+type CommitAnnotations struct {
+	AutoApprove bool
+	AutoMerge   bool
+}
+
+func (c *CommitAnnotations) tagCommitMessage(msg string) string {
+	if c.AutoApprove {
+		msg += "\ngitops-autobot: auto-approve=true\n"
+	}
+	if c.AutoMerge {
+		msg += "\ngitops-autobot: auto-merge=true\n"
+	}
+	return msg
+}
+
 type GitCommitter interface {
-	Commit(w *git.Worktree, msg string, opts *git.CommitOptions, _ autobotcfg.ChangeMakerConfig, perRepo autobotcfg.PerRepoChangeMakerConfig) (plumbing.Hash, error)
+	Commit(w *git.Worktree, msg string, opts *git.CommitOptions, _ autobotcfg.ChangeMakerConfig, perRepo autobotcfg.PerRepoChangeMakerConfig, annotations *CommitAnnotations) (plumbing.Hash, error)
 }
 
 type WorkingTreeChanger interface {
@@ -102,14 +118,24 @@ func (f *Factory) Load(changeMakers []autobotcfg.ChangeMakerConfig, repoCfg auto
 	return ret, nil
 }
 
-func tagCommitMessage(msg string, cfg autobotcfg.PerRepoChangeMakerConfig) string {
-	if cfg.AutoApprove {
-		msg += "\ngitops-autobot: auto-approve=true\n"
+func MergeAnnotations(original *CommitAnnotations, priority *CommitAnnotations) *CommitAnnotations {
+	if original == nil {
+		return priority
 	}
-	if cfg.AutoMerge {
-		msg += "\ngitops-autobot: auto-merge=true\n"
+	if priority == nil {
+		return original
 	}
-	return msg
+	return &CommitAnnotations{
+		AutoApprove: original.AutoApprove || priority.AutoApprove,
+		AutoMerge:   original.AutoMerge || priority.AutoMerge,
+	}
+}
+
+func AnnotationsFromConfig(cfg autobotcfg.PerRepoChangeMakerConfig) *CommitAnnotations {
+	return &CommitAnnotations{
+		AutoApprove: cfg.AutoApprove,
+		AutoMerge:   cfg.AutoMerge,
+	}
 }
 
 func ReEncodeYAML(pluginIn, pluginOut interface{}) error {

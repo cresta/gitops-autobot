@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/cresta/gitops-autobot/internal/autobotcfg"
 	"github.com/cresta/gitops-autobot/internal/changemaker"
@@ -88,9 +89,16 @@ func (f *FileContentWorkingTreeChanger) ChangeWorkingTree(w *git.Worktree, baseC
 	if len(splits) == 0 {
 		return nil
 	}
-	for idx, s := range splits {
+	for _, s := range splits {
 		if err := w.Clean(&git.CleanOptions{Dir: true}); err != nil {
 			return fmt.Errorf("unable to clean for new checkout: %w", err)
+		}
+		if err := w.Checkout(&git.CheckoutOptions{
+			Hash:   baseCommit.Hash,
+			Branch: plumbing.NewBranchReferenceName(branchName(s.Changes)),
+			Create: true,
+		}); err != nil {
+			return fmt.Errorf("unable to check out new branch: %w", err)
 		}
 		if err := w.Reset(&git.ResetOptions{
 			Commit: baseCommit.Hash,
@@ -98,12 +106,9 @@ func (f *FileContentWorkingTreeChanger) ChangeWorkingTree(w *git.Worktree, baseC
 		}); err != nil {
 			return fmt.Errorf("unable to reset after clean: %w", err)
 		}
-		if err := w.Checkout(&git.CheckoutOptions{
-			Hash:   baseCommit.Hash,
-			Branch: plumbing.NewBranchReferenceName(fmt.Sprintf("change_%d", idx)),
-			Create: true,
-		}); err != nil {
-			return fmt.Errorf("unable to check out new branch: %w", err)
+		annotations := changemaker.CommitAnnotations{
+			AutoMerge:   s.AutoMerge,
+			AutoApprove: s.AutoApprove,
 		}
 		for _, c := range s.Changes {
 			f, err := w.Filesystem.Create(c.FileName)
@@ -120,7 +125,7 @@ func (f *FileContentWorkingTreeChanger) ChangeWorkingTree(w *git.Worktree, baseC
 				return fmt.Errorf("unable to git add file %s: %w", c.FileName, err)
 			}
 		}
-		if _, err := gitCommitter.Commit(w, s.CommitTitle+"\n\n"+s.CommitMessage, nil, f.Cfg, f.PerRepo); err != nil {
+		if _, err := gitCommitter.Commit(w, s.CommitTitle+"\n\n"+s.CommitMessage, nil, f.Cfg, f.PerRepo, &annotations); err != nil {
 			return fmt.Errorf("unable to run get commit: %w", err)
 		}
 	}
@@ -131,7 +136,26 @@ type GroupedChange struct {
 	CommitTitle   string
 	CommitMessage string
 	GroupHash     string
+	AutoMerge     bool
+	AutoApprove   bool
 	Changes       []SingleChange
+}
+
+func branchName(changes []SingleChange) string {
+	if len(changes) == 0 {
+		return "filechange"
+	}
+	filteredBranchName := "filechange_" + strings.Map(func(r rune) rune {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || strings.ContainsRune("._", r) {
+			return r
+		}
+		return '_'
+	}, changes[0].FileName)
+	const maximumBranchSize = 100
+	if len(filteredBranchName) > maximumBranchSize {
+		filteredBranchName = filteredBranchName[0:maximumBranchSize]
+	}
+	return filteredBranchName
 }
 
 type SingleChange struct {
@@ -153,16 +177,23 @@ func splitChange(ec []ExpectedChange) []GroupedChange {
 				CommitMessage: c.CommitMessage,
 				GroupHash:     c.GroupHash,
 				Changes:       []SingleChange{thisChange},
+				AutoMerge:     c.AutoMerge,
+				AutoApprove:   c.AutoApprove,
 			})
 			continue
 		}
 		if prev, exists := changesByHash[c.GroupHash]; exists {
 			prev.Changes = append(prev.Changes, thisChange)
+			prev.CommitMessage += "\n" + c.CommitMessage
+			prev.AutoMerge = prev.AutoMerge || c.AutoMerge
+			prev.AutoApprove = prev.AutoApprove || c.AutoApprove
 		} else {
 			changesByHash[c.GroupHash] = &GroupedChange{
 				CommitTitle:   c.CommitTitle,
 				CommitMessage: c.CommitMessage,
 				GroupHash:     c.GroupHash,
+				AutoMerge:     c.AutoMerge,
+				AutoApprove:   c.AutoApprove,
 				Changes:       []SingleChange{thisChange},
 			}
 		}
@@ -177,6 +208,8 @@ type FileChange struct {
 	NewContent    io.WriterTo
 	CommitTitle   string
 	CommitMessage string
+	AutoApprove   bool
+	AutoMerge     bool
 	GroupHash     string
 }
 

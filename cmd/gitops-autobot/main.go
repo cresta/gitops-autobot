@@ -207,15 +207,18 @@ func (m *Service) injection(ctx context.Context, tracer gotracing.Tracing) error
 	if err != nil {
 		return fmt.Errorf("unable to load committer from config: %w", err)
 	}
-	memoryCache1 := &cache.InMemoryCache{}
-	memoryCache2 := &cache.InMemoryCache{}
+	memoryCache := []cache.ClearableCache{
+		&cache.InMemoryCache{},
+		&cache.InMemoryCache{},
+		&cache.InMemoryCache{},
+	}
 	directPRCreatorClient, err := githubdirect.NewFromConfig(ctx, cfg.PRCreator, tracer.WrapRoundTrip(http.DefaultTransport), m.log)
 	if err != nil {
 		return fmt.Errorf("unable to make direct github client: %w", err)
 	}
 	cachedPRCreatorClient := &cachedgithub.CachedGithub{
 		Into:  directPRCreatorClient,
-		Cache: memoryCache1,
+		Cache: memoryCache[0],
 	}
 	prMaker, err := cachedPRCreatorClient.Self(ctx)
 	if err != nil {
@@ -227,7 +230,7 @@ func (m *Service) injection(ctx context.Context, tracer gotracing.Tracing) error
 	}
 	cachedPRReviewerClient := &cachedgithub.CachedGithub{
 		Into:  directPRReviewerClient,
-		Cache: memoryCache2,
+		Cache: memoryCache[1],
 	}
 	cfg, err = ghapp.PopulateRepoDefaultBranches(ctx, cfg, cachedPRCreatorClient)
 	if err != nil {
@@ -244,6 +247,7 @@ func (m *Service) injection(ctx context.Context, tracer gotracing.Tracing) error
 	factory := changemaker.Factory{
 		Factories: []changemaker.WorkingTreeChangerFactory{
 			timechangemaker.Factory, helmchangemaker.MakeFactory(&helm.RepoInfoLoader{
+				Cache:  memoryCache[2],
 				Client: tracedClient,
 				Logger: m.log,
 				LoadersByScheme: map[string]helm.IndexLoader{
@@ -258,7 +262,7 @@ func (m *Service) injection(ctx context.Context, tracer gotracing.Tracing) error
 				},
 			}, &helm.ChangeParser{
 				Logger: m.log,
-			}),
+			}, m.log),
 		},
 	}
 	prCreator := &prcreator.PrCreator{
@@ -288,8 +292,9 @@ func (m *Service) injection(ctx context.Context, tracer gotracing.Tracing) error
 		Logger:       m.log.With(zap.String("class", "gitopsbot")),
 		CronInterval: m.config.CronInterval,
 		OnCron: func(ctx context.Context, logger *zapctx.Logger) {
-			logger.IfErr(memoryCache1.Clear(ctx)).Warn(ctx, "unable to clear first cache")
-			logger.IfErr(memoryCache2.Clear(ctx)).Warn(ctx, "unable to clear second cache")
+			for idx := range memoryCache {
+				logger.IfErr(memoryCache[idx].Clear(ctx)).Warn(ctx, "unable to clear cache")
+			}
 		},
 	}
 	return nil

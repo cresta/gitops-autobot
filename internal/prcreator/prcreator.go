@@ -51,9 +51,9 @@ func (p *PrCreator) Execute(ctx context.Context, checkout *checkout.Checkout) er
 		if err := c.ChangeWorkingTree(wt, obj, p.GitCommitter); err != nil {
 			return fmt.Errorf("unable to change working tree: %w", err)
 		}
-	}
-	if err := checkout.PushAllNewBranches(ctx, p.Client); err != nil {
-		return fmt.Errorf("unable to push new branches: %w", err)
+		if err := checkout.PushAllNewBranches(ctx, p.Client); err != nil {
+			return fmt.Errorf("unable to push new branches: %w", err)
+		}
 	}
 	return nil
 }

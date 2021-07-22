@@ -35,6 +35,7 @@ func TestPrCreator_Execute(t *testing.T) {
 	factory := changemaker.Factory{
 		Factories: []changemaker.WorkingTreeChangerFactory{
 			timechangemaker.Factory, helmchangemaker.MakeFactory(&helm.RepoInfoLoader{
+				Cache:  &cache.InMemoryCache{},
 				Client: http2.DefaultClient,
 				Logger: logger,
 				LoadersByScheme: map[string]helm.IndexLoader{
@@ -49,7 +50,7 @@ func TestPrCreator_Execute(t *testing.T) {
 				},
 			}, &helm.ChangeParser{
 				Logger: logger,
-			}),
+			}, logger),
 		},
 	}
 	testRepoCfg := "test-repo-config.yaml"
