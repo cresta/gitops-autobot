@@ -51,20 +51,20 @@ func (p *PRMerger) processPr(ctx context.Context, pr ghapp.GraphQLPRQueryNode) e
 	//   * PR is mergeable
 	logger := p.Logger.With(zap.Int32("pr", int32(pr.Number)))
 	logger.Debug(ctx, "processing pr", zap.Any("pr", pr))
-	if pr.Merged {
-		logger.Debug(ctx, "already merged!")
-		return nil
-	}
-	if pr.Mergeable != githubv4.MergeableStateMergeable {
-		logger.Info(ctx, "cannot merge with state not clean", zap.String("state", string(pr.Mergeable)))
-		return nil
-	}
 	if !p.prAskingForAutoMerge(string(pr.Body)) {
 		logger.Debug(ctx, "pr not asking for review")
 		return nil
 	}
+	if pr.Merged {
+		logger.Debug(ctx, "already merged!")
+		return nil
+	}
 	if pr.IsDraft {
 		logger.Debug(ctx, "ignoring draft PR")
+		return nil
+	}
+	if pr.Mergeable != githubv4.MergeableStateMergeable {
+		logger.Info(ctx, "cannot merge with state not clean", zap.String("state", string(pr.Mergeable)))
 		return nil
 	}
 	if pr.HeadRef.Target.Commit.StatusCheckRollup.State != githubv4.StatusStateSuccess {
