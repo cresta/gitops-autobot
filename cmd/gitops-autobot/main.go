@@ -178,6 +178,7 @@ func (m *Service) Main() {
 	}
 	m.gitopsBot.Setup()
 	go m.gitopsBot.Cron(ctx)
+	m.log.Info(ctx, "Listening on HTTP", zap.String("addr", m.config.ListenAddr))
 	serveErr := httpsimple.BasicServerRun(m.log, m.server, m.onListen, m.config.ListenAddr)
 	m.gitopsBot.Stop()
 	shutdownCallback()
@@ -187,6 +188,8 @@ func (m *Service) Main() {
 }
 
 func (m *Service) injection(ctx context.Context, tracer gotracing.Tracing) error {
+	m.log.Info(ctx, "<-injection")
+	defer m.log.Info(ctx, "->injection")
 	tracedClient := &http.Client{
 		Transport: tracer.WrapRoundTrip(http.DefaultTransport),
 	}

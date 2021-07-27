@@ -7,7 +7,7 @@ require (
 	github.com/Masterminds/semver/v3 v3.1.1
 	github.com/Microsoft/go-winio v0.5.0 // indirect
 	github.com/ProtonMail/go-crypto v0.0.0-20210707164159-52430bf6b52c // indirect
-	github.com/aws/aws-sdk-go v1.27.0
+	github.com/aws/aws-sdk-go v1.40.9
 	github.com/bradleyfalzon/ghinstallation v1.1.1
 	github.com/cresta/gotracing v0.0.3
 	github.com/cresta/httpsimple v0.0.1
@@ -28,11 +28,10 @@ require (
 	github.com/signalfx/golib/v3 v3.3.35
 	github.com/stretchr/testify v1.7.0
 	github.com/tinylib/msgp v1.1.6 // indirect
-	go.uber.org/atomic v1.8.0 // indirect
+	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.7.0 // indirect
 	go.uber.org/zap v1.18.1
 	golang.org/x/crypto v0.0.0-20210711020723-a769d52b0f97 // indirect
-	golang.org/x/net v0.0.0-20210614182718-04defd469f4e // indirect
 	golang.org/x/sys v0.0.0-20210630005230-0f9fa26af87c // indirect
 	golang.org/x/time v0.0.0-20210611083556-38a9dc6acbc6 // indirect
 	google.golang.org/protobuf v1.27.1 // indirect
@@ -42,3 +41,5 @@ require (
 	k8s.io/client-go v0.21.2 // indirect
 	rsc.io/letsencrypt v0.0.3 // indirect
 )
+
+exclude github.com/go-logr/logr v1.0.0
