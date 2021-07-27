@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go/service/s3"
+
 	"github.com/Masterminds/semver/v3"
 	"github.com/cresta/gitops-autobot/internal/cache"
 	"github.com/cresta/zapctx"
@@ -207,7 +209,38 @@ func (h *HTTPLoader) LoadIndexFile(ctx context.Context, url string) (*repo.Index
 	return ret, nil
 }
 
+type S3Loader struct {
+	Logger *zapctx.Logger
+	Client *s3.S3
+}
+
+func (h *S3Loader) LoadIndexFile(ctx context.Context, urlStr string) (*repo.IndexFile, error) {
+	urlStr = strings.TrimSuffix(urlStr, "/")
+	urlStr = strings.TrimSuffix(urlStr, "/index.yaml")
+	urlStr += "/index.yaml"
+	parsedURL, err := url.Parse(urlStr)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse URL for S3: %w", err)
+	}
+	out, err := h.Client.GetObjectWithContext(ctx, &s3.GetObjectInput{
+		Bucket: &parsedURL.Host,
+		Key:    &parsedURL.Path,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("unable to fetch object %s from S3: %w", urlStr, err)
+	}
+	defer func() {
+		h.Logger.IfErr(out.Body.Close()).Warn(ctx, "unable to close s3 response body")
+	}()
+	ret, err := LoadFromReader(ctx, out.Body, h.Logger)
+	if err != nil {
+		return nil, fmt.Errorf("unable to load repo from body: %w", err)
+	}
+	return ret, nil
+}
+
 var _ IndexLoader = &HTTPLoader{}
+var _ IndexLoader = &S3Loader{}
 
 func LoadFromReader(ctx context.Context, reader io.Reader, logger *zapctx.Logger) (*repo.IndexFile, error) {
 	f, err := ioutil.TempFile("", "helm_load_from_reader")

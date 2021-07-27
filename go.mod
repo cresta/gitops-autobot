@@ -7,6 +7,7 @@ require (
 	github.com/Masterminds/semver/v3 v3.1.1
 	github.com/Microsoft/go-winio v0.5.0 // indirect
 	github.com/ProtonMail/go-crypto v0.0.0-20210707164159-52430bf6b52c // indirect
+	github.com/aws/aws-sdk-go v1.27.0
 	github.com/bradleyfalzon/ghinstallation v1.1.1
 	github.com/cresta/gotracing v0.0.3
 	github.com/cresta/httpsimple v0.0.1

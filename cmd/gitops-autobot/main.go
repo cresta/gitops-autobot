@@ -10,6 +10,9 @@ import (
 	"os"
 	"time"
 
+	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/cresta/gitops-autobot/internal/awssetup"
+
 	"github.com/cresta/gitops-autobot/internal/changemaker/filecontentchangemaker/helmchangemaker"
 	"github.com/cresta/gitops-autobot/internal/versionfetch/helm"
 
@@ -245,6 +248,10 @@ func (m *Service) injection(ctx context.Context, tracer gotracing.Tracing) error
 		}
 		allCheckouts = append(allCheckouts, co)
 	}
+	session, err := awssetup.CreateSession(ctx, m.log, tracedClient)
+	if err != nil {
+		return fmt.Errorf("unable to make AWS/S3 client: %w", err)
+	}
 	factory := changemaker.Factory{
 		Factories: []changemaker.WorkingTreeChangerFactory{
 			timechangemaker.Factory, helmchangemaker.MakeFactory(&helm.RepoInfoLoader{
@@ -259,6 +266,10 @@ func (m *Service) injection(ctx context.Context, tracer gotracing.Tracing) error
 					"http": &helm.HTTPLoader{
 						Logger: m.log,
 						Client: tracedClient,
+					},
+					"s3": &helm.S3Loader{
+						Logger: m.log,
+						Client: s3.New(session),
 					},
 				},
 			}, &helm.ChangeParser{
