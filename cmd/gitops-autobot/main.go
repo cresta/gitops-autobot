@@ -10,6 +10,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/cresta/gitops-autobot/internal/changemaker/shellchangemaker"
+
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/cresta/gitops-autobot/internal/awssetup"
 
@@ -257,6 +259,7 @@ func (m *Service) injection(ctx context.Context, tracer gotracing.Tracing) error
 	}
 	factory := changemaker.Factory{
 		Factories: []changemaker.WorkingTreeChangerFactory{
+			shellchangemaker.MakeFactory(m.log),
 			timechangemaker.Factory, helmchangemaker.MakeFactory(&helm.RepoInfoLoader{
 				Cache:  memoryCache[2],
 				Client: tracedClient,

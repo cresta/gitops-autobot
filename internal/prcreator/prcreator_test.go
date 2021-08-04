@@ -9,6 +9,10 @@ import (
 	"os"
 	"testing"
 
+	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/cresta/gitops-autobot/internal/awssetup"
+	"github.com/cresta/gitops-autobot/internal/changemaker/shellchangemaker"
+
 	"github.com/cresta/gitops-autobot/internal/changemaker/filecontentchangemaker/helmchangemaker"
 	"github.com/cresta/gitops-autobot/internal/versionfetch/helm"
 
@@ -33,8 +37,11 @@ func TestPrCreator_Execute(t *testing.T) {
 	}()
 	ctx := context.Background()
 	logger := testhelp.ZapTestingLogger(t)
+	session, err := awssetup.CreateSession(ctx, logger, http2.DefaultClient)
+	require.NoError(t, err)
 	factory := changemaker.Factory{
 		Factories: []changemaker.WorkingTreeChangerFactory{
+			shellchangemaker.MakeFactory(logger),
 			timechangemaker.Factory, helmchangemaker.MakeFactory(&helm.RepoInfoLoader{
 				Cache:  &cache.InMemoryCache{},
 				Client: http2.DefaultClient,
@@ -47,6 +54,10 @@ func TestPrCreator_Execute(t *testing.T) {
 					"http": &helm.HTTPLoader{
 						Logger: logger,
 						Client: http2.DefaultClient,
+					},
+					"s3": &helm.S3Loader{
+						Logger: logger,
+						Client: s3.New(session),
 					},
 				},
 			}, &helm.ChangeParser{

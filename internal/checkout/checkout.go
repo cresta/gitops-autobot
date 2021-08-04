@@ -24,21 +24,33 @@ import (
 )
 
 type Checkout struct {
-	RepoConfig autobotcfg.RepoConfig
-	auth       transport.AuthMethod
-	Repo       *git.Repository
-	Logger     *zapctx.Logger
+	RepoConfig        RepoConfig
+	CheckoutDirectory string
+	auth              transport.AuthMethod
+	Repo              *git.Repository
+	Logger            *zapctx.Logger
 }
 
-func NewCheckout(ctx context.Context, logger *zapctx.Logger, cfg autobotcfg.RepoConfig, cloneDataDirectory string, auth transport.AuthMethod) (*Checkout, error) {
-	ch := Checkout{
-		RepoConfig: cfg,
-		auth:       auth,
-		Logger:     logger,
-	}
+type RepoConfig interface {
+	CloneURL() string
+	RemoteBranch() string
+	RemoteOwner() string
+	RemoteName() string
+	fmt.Stringer
+}
+
+var _ RepoConfig = &autobotcfg.RepoConfig{}
+
+func NewCheckout(ctx context.Context, logger *zapctx.Logger, cfg RepoConfig, cloneDataDirectory string, auth transport.AuthMethod) (*Checkout, error) {
 	into, err := ioutil.TempDir(cloneDataDirectory, "checkout")
 	if err != nil {
 		return nil, fmt.Errorf("unable to clone into %s: %w", cloneDataDirectory, err)
+	}
+	ch := Checkout{
+		RepoConfig:        cfg,
+		auth:              auth,
+		Logger:            logger,
+		CheckoutDirectory: into,
 	}
 	var progress bytes.Buffer
 	repo, err := git.PlainCloneContext(ctx, into, false, &git.CloneOptions{
@@ -46,7 +58,7 @@ func NewCheckout(ctx context.Context, logger *zapctx.Logger, cfg autobotcfg.Repo
 		Auth:          ch.auth,
 		Progress:      &progress,
 		SingleBranch:  true,
-		ReferenceName: plumbing.NewBranchReferenceName(cfg.Branch),
+		ReferenceName: plumbing.NewBranchReferenceName(cfg.RemoteBranch()),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("unable to do initial clone of %s: %w", cfg.CloneURL(), err)
@@ -165,7 +177,7 @@ func (c *Checkout) SetupForWorkingTreeChanger(ctx context.Context) (*git.Worktre
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to get working tree: %w", err)
 	}
-	refName := plumbing.NewRemoteReferenceName("origin", c.RepoConfig.Branch)
+	refName := plumbing.NewRemoteReferenceName("origin", c.RepoConfig.RemoteBranch())
 	ref, err := c.Repo.Reference(refName, true)
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to get remote reference: %w", err)
@@ -204,12 +216,12 @@ func (c *Checkout) PushAllNewBranches(ctx context.Context, client ghapp.GithubAP
 		return fmt.Errorf("unable to iterate branches")
 	}
 	c.Logger.Debug(ctx, "pushing new branches", zap.Any("all_branches", branchesToPush))
-	repoInfo, queryErr := client.RepositoryInfo(ctx, c.RepoConfig.Owner, c.RepoConfig.Name)
+	repoInfo, queryErr := client.RepositoryInfo(ctx, c.RepoConfig.RemoteOwner(), c.RepoConfig.RemoteName())
 	if queryErr != nil {
 		return fmt.Errorf("unable to execute graphql query: %w", err)
 	}
 	for _, b := range branchesToPush {
-		if exists, err := client.DoesBranchExist(ctx, c.RepoConfig.Owner, c.RepoConfig.Name, b.Src()); err != nil {
+		if exists, err := client.DoesBranchExist(ctx, c.RepoConfig.RemoteOwner(), c.RepoConfig.RemoteName(), b.Src()); err != nil {
 			c.Logger.IfErr(err).Warn(ctx, "unable to verify if branch exists.  Assume it does not")
 		} else if exists {
 			c.Logger.Debug(ctx, "branch exists.  Skipping another PR")
@@ -234,9 +246,9 @@ func (c *Checkout) PushAllNewBranches(ctx context.Context, client ghapp.GithubAP
 		if prObj == nil {
 			prObj = &github.NewPullRequest{}
 		}
-		prObj.Base = &c.RepoConfig.Branch
+		prObj.Base = github.String(c.RepoConfig.RemoteBranch())
 		prObj.Head = github.String(b.Reverse().Src())
-		if _, err := client.CreatePullRequest(ctx, c.RepoConfig.Owner, c.RepoConfig.Name, githubv4.CreatePullRequestInput{
+		if _, err := client.CreatePullRequest(ctx, c.RepoConfig.RemoteOwner(), c.RepoConfig.RemoteName(), githubv4.CreatePullRequestInput{
 			RepositoryID: repoInfo.Repository.ID,
 			BaseRefName:  repoInfo.Repository.DefaultBranchRef.Name,
 			HeadRefName:  githubv4.String(b.Src()),

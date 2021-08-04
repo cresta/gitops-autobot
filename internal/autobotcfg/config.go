@@ -55,12 +55,24 @@ type RepoConfig struct {
 	Name   string `yaml:"name"`
 }
 
+func (r RepoConfig) RemoteOwner() string {
+	return r.Owner
+}
+
+func (r RepoConfig) RemoteName() string {
+	return r.Name
+}
+
 func (r RepoConfig) String() string {
 	return fmt.Sprintf("%s/%s:%s", r.Owner, r.Name, r.Branch)
 }
 
 func (r RepoConfig) CloneURL() string {
 	return fmt.Sprintf("https://github.com/%s/%s.git", r.Owner, r.Name)
+}
+
+func (r RepoConfig) RemoteBranch() string {
+	return r.Branch
 }
 
 type PerRepoChangeMakerConfig struct {
@@ -70,10 +82,12 @@ type PerRepoChangeMakerConfig struct {
 	AutoMerge      bool        `yaml:"autoMerge"`
 	Data           interface{} `yaml:"data"`
 	regexp         []*regexp.Regexp
+	Which          string `yaml:"which"`
 }
 
 type ChangeMakerConfig struct {
-	Name string `yaml:"name"`
+	Name string      `yaml:"name"`
+	Data interface{} `yaml:"data"`
 }
 
 func (c *PerRepoChangeMakerConfig) Regex() []*regexp.Regexp {
