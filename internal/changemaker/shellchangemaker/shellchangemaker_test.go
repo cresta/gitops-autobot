@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -76,6 +77,12 @@ func TestShellChangeMaker(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skipf("Skipping test because cannot find git binary: %v", err)
 	}
+	var fileBinary string
+	if runtime.GOOS == "windows" {
+		fileBinary = "makertest.bat"
+	} else {
+		fileBinary = "makertest.sh"
+	}
 	td, err := ioutil.TempDir("", "TestShellChangeMaker")
 	require.NoError(t, err)
 	defer func() {
@@ -93,7 +100,7 @@ func TestShellChangeMaker(t *testing.T) {
 		AuthorEmail: "john.doe@example.com",
 	})
 	require.NoError(t, err)
-	testFileOne, err := filepath.Abs("makertest.bat")
+	testFileOne, err := filepath.Abs(fileBinary)
 	require.NoError(t, err)
 	s := ShellChangeMaker{
 		ShellData: ShellData{
@@ -107,5 +114,5 @@ func TestShellChangeMaker(t *testing.T) {
 	require.NoError(t, s.ChangeWorkingTree(wt, baseCmt, committer, td))
 	b, err := ioutil.ReadFile(filepath.Join(td, "go.mod"))
 	require.NoError(t, err)
-	require.Equal(t, "module example.com\n\ngo 1.15\n", string(b))
+	require.Contains(t, string(b), "module example.com")
 }
