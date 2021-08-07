@@ -82,3 +82,4 @@ jobs:
         with:
           reporter: github-pr-check
           fail_on_error: true
+          hadolint_ignore: DL3059 DL3008

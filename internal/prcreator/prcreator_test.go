@@ -30,6 +30,10 @@ import (
 )
 
 func TestPrCreator_Execute(t *testing.T) {
+	testRepoCfg := "test-repo-config.yaml"
+	if _, err := os.Stat(testRepoCfg); os.IsNotExist(err) {
+		t.Skipf("Unable to find testing repo config file %s", testRepoCfg)
+	}
 	td, err := ioutil.TempDir("", "TestPrCreator_Execute")
 	require.NoError(t, err)
 	defer func() {
@@ -64,10 +68,6 @@ func TestPrCreator_Execute(t *testing.T) {
 				Logger: logger,
 			}, logger),
 		},
-	}
-	testRepoCfg := "test-repo-config.yaml"
-	if _, err := os.Stat(testRepoCfg); os.IsNotExist(err) {
-		t.Skipf("Unable to find testing repo config file %s", testRepoCfg)
 	}
 	f, err := os.Open(testRepoCfg)
 	require.NoError(t, err)

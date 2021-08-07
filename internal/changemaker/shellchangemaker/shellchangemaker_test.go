@@ -73,6 +73,9 @@ func TestShellChangeMaker(t *testing.T) {
 	if _, err := exec.LookPath("go"); err != nil {
 		t.Skipf("Skipping test because cannot find go binary: %v", err)
 	}
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skipf("Skipping test because cannot find git binary: %v", err)
+	}
 	td, err := ioutil.TempDir("", "TestShellChangeMaker")
 	require.NoError(t, err)
 	defer func() {
