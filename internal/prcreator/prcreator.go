@@ -48,7 +48,7 @@ func (p *PrCreator) Execute(ctx context.Context, checkout *checkout.Checkout) er
 		if err != nil {
 			return fmt.Errorf("unable to setup working tree: %w", err)
 		}
-		if err := c.ChangeWorkingTree(wt, obj, p.GitCommitter); err != nil {
+		if err := c.ChangeWorkingTree(wt, obj, p.GitCommitter, checkout.CheckoutDirectory); err != nil {
 			return fmt.Errorf("unable to change working tree: %w", err)
 		}
 		if err := checkout.PushAllNewBranches(ctx, p.Client); err != nil {

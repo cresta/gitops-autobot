@@ -58,7 +58,7 @@ func (g *gitFile) Name() string {
 
 var _ ReadableFile = &gitFile{}
 
-func (f *FileContentWorkingTreeChanger) ChangeWorkingTree(w *git.Worktree, baseCommit *object.Commit, gitCommitter changemaker.GitCommitter) error {
+func (f *FileContentWorkingTreeChanger) ChangeWorkingTree(w *git.Worktree, baseCommit *object.Commit, gitCommitter changemaker.GitCommitter, _ string) error {
 	ctx := context.TODO()
 	files, err := baseCommit.Files()
 	if err != nil {
