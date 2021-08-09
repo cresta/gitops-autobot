@@ -50,7 +50,7 @@ jobs:
           args: -v docker:build
         env:
           DOCKER_FILE: ./full_docker_image/Dockerfile
-          DOCKER_TAG_SUFFIX: -full
+          DOCKER_REPOSITORY: cresta/gitops-autobot-full
       - name: Build and Push image (full)
         if: github.event_name == 'push'
         uses: magefile/mage-action@v1
@@ -61,7 +61,7 @@ jobs:
           DOCKER_PUSH_REMOTE_CACHE: true
           DOCKER_PUSH: true
           DOCKER_FILE: ./full_docker_image/Dockerfile
-          DOCKER_TAG_SUFFIX: -full
+          DOCKER_REPOSITORY: cresta/gitops-autobot-full
   go_test:
     name: Run go tests
     runs-on: ubuntu-latest
