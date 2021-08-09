@@ -9,7 +9,7 @@ require (
 	github.com/bradleyfalzon/ghinstallation v1.1.1
 	github.com/cresta/gotracing v0.0.3
 	github.com/cresta/httpsimple v0.0.1
-	github.com/cresta/magehelper v0.0.55
+	github.com/cresta/magehelper v0.0.56
 	github.com/cresta/zapctx v0.0.1
 	github.com/cyphar/filepath-securejoin v0.2.3 // indirect
 	github.com/go-git/go-git/v5 v5.4.2
