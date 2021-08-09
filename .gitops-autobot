@@ -1,0 +1,3 @@
+changeMakers:
+  -  name: cmd
+     which: goget
