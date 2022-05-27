@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/cresta/gitops-autobot/internal/autobotcfg"
 	"github.com/cresta/gitops-autobot/internal/ghapp"
@@ -44,6 +45,10 @@ func (p *PRMerger) Execute(ctx context.Context) error {
 }
 
 func (p *PRMerger) processPr(ctx context.Context, pr ghapp.GraphQLPRQueryNode) error {
+	return p.processPrIter(ctx, pr, 0)
+}
+
+func (p *PRMerger) processPrIter(ctx context.Context, pr ghapp.GraphQLPRQueryNode, itr int) error {
 	// Will merge a PR if all these are true
 	//   * "gitops-autobot: auto-merge=true" contained in body on line by itself (spaces trimmed)
 	//   * Not a draft
@@ -86,6 +91,16 @@ func (p *PRMerger) processPr(ctx context.Context, pr ghapp.GraphQLPRQueryNode) e
 		ExpectedHeadOid: &pr.HeadRef.Target.Oid,
 		MergeMethod:     &method,
 	}); err != nil {
+		if strings.Contains(err.Error(), "Review and try the merge again") && itr == 0 {
+			// Wait a few seconds and try again (but just one time)
+			// https://github.community/t/merging-via-rest-api-returns-405-base-branch-was-modified-review-and-try-the-merge-again/13787
+			select {
+			case <-time.After(time.Second * 5):
+				return p.processPrIter(ctx, pr, itr+1)
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		}
 		return fmt.Errorf("unable to do create a merge: %w", err)
 	}
 	return nil

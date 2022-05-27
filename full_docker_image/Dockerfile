@@ -1,5 +1,5 @@
 # Contains a large number of scripts and extras for go, helm, and other additions we need
-FROM golang:1.16.0-buster AS builder
+FROM golang:1.18.2-buster AS builder
 # hadolint ignore=DL3008
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -24,7 +24,7 @@ LABEL org.opencontainers.image.source=https://github.com/cresta/gitops-autobot
 COPY --from=builder /work/main /main
 RUN apt-get update && apt-get install --no-install-recommends -y wget git ca-certificates && apt-get clean && rm -rf /var/lib/apt/lists/*
 WORKDIR /tmp
-RUN wget --progress=dot:giga https://golang.org/dl/go1.16.7.linux-amd64.tar.gz && tar -xf go1.16.7.linux-amd64.tar.gz && mv /tmp/go /bin
+RUN wget --progress=dot:giga https://go.dev/dl/go1.18.2.linux-amd64.tar.gz && tar -xf go1.18.2.linux-amd64.tar.gz && mv /tmp/go /bin
 WORKDIR /
 ENV PATH=$PATH:/bin/go/bin
 RUN go version
